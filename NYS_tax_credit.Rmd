@@ -1,0 +1,36 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+NYS_tax <- read_csv('NYS_Corp_Tax_Credit_data/New_York_State_Corporate_Tax_Credits_by_Size_of_Credit_Used__Beginning_Tax_Year_2001.csv')
+```
+
+```{r}
+summary(NYS_tax)
+head(NYS_tax)
+NYS_tax %>% filter(is.na(`Number of Taxpayers`)) 
+NYS_tax %>% filter(is.na(`Number of Taxpayers`)) %>% distinct(Notes)
+#3146 records have missing values for fields: Number of Taxpayers, Amount of Credit, Percent of Credit, Median Amount of Credit, Mean Amount of Credit due to secrecy laws (Notes section contains /d for all of them). These records will be omitted.
+```
+
+```{r}
+NYS_tax %>% filter(str_detect(Notes, 'd')) %>% drop_na('Number of Taxpayers') #%>% distinct(`Number of Taxpayers`)
+
+#An additional 166 records contain missing values for Median Amount of Credit, but report real values for all other fields, thus these will be kept for analysis.
+```
+
+```{r}
+NYS_tax_neg <- NYS_tax %>% filter(`Used Group` == 'Negative')
+
+NYS_tax_neg %>% distinct(`Number of Taxpayers`)
+NYS_tax_neg %>% select(`Amount of Credit`) %>% distinct()
+NYS_tax %>% select(`Credit Type`, `Used Group`, `Amount of Credit`, `Number of Taxpayers`)
+```
+
+```{r}
+131756/8
+```
+
