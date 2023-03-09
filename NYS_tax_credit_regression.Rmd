@@ -1,0 +1,37 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r} 
+#Call Libraries
+library(tidyverse)
+library(caret)
+```
+
+
+Calling the Transformed Datasets
+```{r}
+
+```
+
+Creating the Model
+```{r}
+logit.model = glm(y ~ . -Amount -Avg, family = 'binomial', data = income_cat)
+summary(logit.model)
+plot(logit.model)
+
+sum(round(exp(predict(logit.model, income_cat))/(1+exp(predict(logit.model, income_cat)))) == income_cat$y)/length(income_cat$y)
+```
+
+```{r}
+model.saturated <- lm(Avg ~ . -Amount, data = income_cleaned)
+summary(model.saturated)
+
+income_cleaned %>% select(Name) %>% distinct()
+#next steps: take a look at AIC, BIC, VIF with stepwise regression. Also possibly transforming response variable. 
+```
+
+```{r}
+plot(model.saturated)
+```

@@ -1,0 +1,174 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r} 
+#Call Libraries
+library(tidyverse)
+library(caret)
+```
+
+
+```{r}
+#Load Datasets
+NYS_tax_credit_used <- read_csv('NYS_Corp_Tax_Credit_data/NYS_tax_credit_used.csv')
+NYS_tax_credit_net_income <- read_csv('NYS_Corp_Tax_Credit_data/NYS_tax_credit_net_income.csv')
+NYS_tax_credit_taxation_basis <- read_csv('NYS_Corp_Tax_Credit_data/NYS_tax_credit_taxation_basis.csv')
+NYS_tax_credit_industry <- read_csv('NYS_Corp_Tax_Credit_data/NYS_tax_credit_industry.csv')
+```
+
+Cleaning the Dataset
+```{r}
+net_income_earned_total <- NYS_tax_credit_net_income %>% filter(`ENI Group` == 'Total', `Credit Type` == 'Credit Earned') %>% select(Year = `Tax Year`, Name = `Credit Name`, Num = `Number of Taxpayers`, Amount = `Amount of Credit`)
+net_income_earned_total %>% filter(is.na(Amount))
+
+#NYS_tax_credit_net_income %>% select(-c(12,13)) %>% filter(`Credit Type` == 'Credit Earned') %>% pivot_wider(names_from = `ENI Group`, values_from = `Number of Taxpayers`)
+```
+
+```{r}
+net_income_earned <- NYS_tax_credit_net_income %>% filter(`ENI Group` != 'Total', `Credit Type` == 'Credit Earned') %>% select(Year = `Tax Year`, Name = `Credit Name`, ENI = `ENI Group`, Num = `Number of Taxpayers`, Amount = `Amount of Credit`)
+
+net_income_earned
+
+net_income_earned %>% group_by(Year, Name) %>% mutate(e_total_num = sum(Num, na.rm = T), e_total_amount = sum(Amount, na.rm = T)) %>% filter(is.na(e_total_num))
+
+```
+
+```{r}
+# inner_join(net_income_earned, net_income_earned_total, by = c('Year', 'Name'), suffix = c('_e', '_t')) %>% 
+#   group_by(Year, Name) %>% 
+#   mutate(e_total_num = sum(Num_e, na.rm = T), 
+#          e_total_amount = sum(Amount_e, na.rm = T), 
+#          Num_missing = sum(is.na(Num_e))) %>%
+#   mutate(Num_e = ifelse(is.na(Num_e), (Num_t-e_total_num)/Num_missing, Num_e))
+# 
+# #%>%
+#  # filter(is.na(Num_t), e_total_amount > 0)
+# 
+# 
+# 
+# (Num_t-e_total_num)/Num_missing
+# 
+# 
+# #sum(is.na(c(NA,NA,1)))
+
+```
+
+
+Imputing Credit Earned Data
+```{r}
+nasum <- function (x) {
+  return (sum(is.na(x)))
+}
+#nasum(c(NA, 1, 2, 3, NA, 0))
+```
+
+```{r}
+income_cleaned <- inner_join(net_income_earned, net_income_earned_total, by = c('Year', 'Name'), suffix = c('_e', '_t')) %>% 
+  filter(!is.na(Num_t), Num_t != 0) %>%
+  group_by(Year, Name) %>%
+  #mutate(impute_num = ifelse(nasum(Num_e) == 0, 0, (Num_t-sum(Num_e, na.rm = T))/nasum(Num_e)),
+  #      impute_amt = ifelse(nasum(Amount_e) == 0, 0, (Amount_t-sum(Amount_e, na.rm = T))/nasum(Amount_e)))
+  mutate(impute_num = (Num_t-sum(Num_e, na.rm = T))/nasum(Num_e),
+         impute_amt = (Amount_t-sum(Amount_e, na.rm = T))/nasum(Amount_e)) %>%
+  mutate(Num_e = ifelse(is.na(Num_e), impute_num, Num_e), Amount_e = ifelse(is.na(Amount_e), impute_amt, Amount_e)) %>%
+  select(Year, Name, ENI, Num = Num_e, Amount = Amount_e) %>%
+  mutate(Avg = ifelse(Num == 0, 0, Amount/Num)) %>%
+  filter(Num != 0) %>%
+  ungroup()
+
+income_cleaned %>% is.na() %>% sum()
+```
+
+```{r}
+table(income_cleaned$Num)
+income_cleaned
+```
+
+```{r}
+Avg_mean = income_cleaned %>% summarise(mean(Avg)) %>% first()
+
+income_cat = income_cleaned %>% mutate(y = ifelse(Avg > Avg_mean, 1, 0))
+income_cat %>% ggplot(aes(log(Num))) + geom_histogram()
+
+income_cat = income_cat %>% mutate(log_Num = log(Num))
+
+```
+
+```{r}
+linear.model.cat <- lm(Avg ~ . -y-Amount-Num, data = income_cat)
+summary(linear.model.cat)
+plot(linear.model.cat)
+```
+
+```{r}
+linear.model.cat2 <- lm(Avg ~ . -y-Amount-log_Num, data = income_cat)
+summary(linear.model.cat2)
+plot(linear.model.cat2)
+```
+
+```{r}
+library(car)
+bc = boxCox(linear.model.cat2)
+lambda = bc$x[which(bc$y == max(bc$y))] #Extracting the best lambda value.
+lambda
+
+income_cat_bc <- income_cat %>% mutate(Avg.bc = (Avg^lambda -1)/lambda) %>% select(-c(y, Avg, Amount, log_Num))
+income_cat_bc
+model.bc = lm(Avg.bc ~ ., data = income_cat_bc)
+summary(model.bc)
+```
+```{r}
+plot(model.bc)
+```
+
+```{r}
+vif(model.bc)
+influencePlot(model.bc)
+avPlots(model.bc)
+BIC(model.bc, linear.model.cat2)
+```
+
+Stepwise Regression on Income_cat_bc (boxcox transformed dataset)
+```{r}
+#creating dummy variable columns for stepwise
+x = model.matrix(Avg.bc ~., income_cat_bc)[, -1]
+dummy_bc = as.data.frame(x) %>% mutate(Avg.bc = income_cat_bc$Avg.bc)
+```
+
+```{r}
+#creating models
+model.empty = lm(Avg.bc ~ 1, data = dummy_bc) #intercept only
+model.full = lm(Avg.bc ~ ., data = dummy_bc) #All variables
+scope = list(lower = formula(model.empty), upper = formula(model.full))
+n_obs = dummy_bc %>% count() %>% first()
+```
+
+```{r}
+library(MASS) #The Modern Applied Statistics library.
+
+colnames(dummy_bc)
+
+colnames(dummy_bc) <- str_replace_all(colnames(dummy_bc), "-|'|/| |,|�" , '_')
+
+colnames(dummy_bc)[37] <- 'NameManufactureru0092s_Real_Property_Tax_Credit'
+
+colnames(dummy_bc)
+
+?str_replace()
+```
+
+```{r}
+#Stepwise regression using BIC as the criteria (the penalty k = log(n)).
+forwardBIC = step(model.empty, scope, direction = "forward", k = log(n_obs))
+backwardBIC = step(model.full, scope, direction = "backward", k = log(n_obs))
+summary(forwardBIC)
+```
+
+```{r}
+income_cat_bc
+```
+
+
+

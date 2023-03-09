@@ -6,6 +6,7 @@ output: html_notebook
 ```{r} 
 #Call Libraries
 library(tidyverse)
+library(caret)
 ```
 
 
@@ -17,50 +18,37 @@ NYS_tax_credit_taxation_basis <- read_csv('NYS_Corp_Tax_Credit_data/NYS_tax_cred
 NYS_tax_credit_industry <- read_csv('NYS_Corp_Tax_Credit_data/NYS_tax_credit_industry.csv')
 ```
 
-```{r}
-EDA <- function (df) {
-  #print.data.frame(summary(df))
-  print(dim(df))
-  #print(head(df))
-  #df %>% filter(is.na(`Number of Taxpayers`))
-}
-```
 
-```{r}
-for (df in c(NYS_tax_credit_used)) {
-  EDA(df)
-}
-#summary(NYS_tax_credit_used)
-```
-
+Credit Used Dataset Analysis
 ```{r}
 summary(NYS_tax)
 head(NYS_tax)
-NYS_tax %>% filter(is.na(`Number of Taxpayers`)) 
-NYS_tax %>% filter(is.na(`Number of Taxpayers`)) %>% distinct(Notes)
+NYS_tax_credit_used %>% filter(is.na(`Number of Taxpayers`)) 
+NYS_tax_credit_used %>% filter(is.na(`Number of Taxpayers`)) %>% distinct(Notes)
 #3146 records have missing values for fields: Number of Taxpayers, Amount of Credit, Percent of Credit, Median Amount of Credit, Mean Amount of Credit due to secrecy laws (Notes section contains /d for all of them). These records will be omitted.
 ```
 
 ```{r}
-NYS_tax %>% filter(str_detect(Notes, 'd')) %>% drop_na('Number of Taxpayers') #%>% distinct(`Number of Taxpayers`)
+NYS_tax_credit_used %>% filter(str_detect(Notes, 'd')) %>% drop_na('Number of Taxpayers') #%>% distinct(`Number of Taxpayers`)
 
 #An additional 166 records contain missing values for Median Amount of Credit, but report real values for all other fields, thus these will be kept for analysis.
 ```
 
 ```{r}
-NYS_tax_neg <- NYS_tax %>% filter(`Used Group` == 'Negative')
+NYS_tax_neg <- NYS_tax_credit_used %>% filter(`Used Group` == 'Negative')
 
 NYS_tax_neg %>% distinct(`Number of Taxpayers`)
 NYS_tax_neg %>% select(`Amount of Credit`) %>% distinct()
-NYS_tax %>% select(`Credit Type`, `Used Group`, `Amount of Credit`, `Number of Taxpayers`)
+NYS_tax_credit_used %>% select(`Credit Type`, `Used Group`, `Amount of Credit`, `Number of Taxpayers`)
 ```
 
 
 
-Net Income dataset analysis
+Net Income Dataset Analysis
 ```{r}
 dim(NYS_tax_credit_net_income)
 head(NYS_tax_credit_net_income, 12)
+summary(NYS_tax_credit_net_income)
 NYS_tax_credit_net_income %>% select(`ENI Group`) %>% distinct() #10 different ENI Groups including the Total (so essentially 9)
 NYS_tax_credit_net_income %>% filter(`Credit Name` == 'Alcoholic Beverage Production Credit', `Credit Type` == 'Credit Earned') %>% group_by(`ENI Group`) %>% summarise(sum(`Number of Taxpayers`, na.rm = T))
 
@@ -70,8 +58,64 @@ sum(NYS_tax_credit_net_income$`Number of Taxpayers`, na.rm = T)/2
 ```
 
 ```{r}
+table(NYS_tax_credit_net_income %>% filter(`Credit Type` == 'Credit Earned', `ENI Group` == 'Total') %>% select(`Amount of Credit`))
+dim(NYS_tax_credit_net_income %>% filter(`Credit Type` == 'Credit Earned', `ENI Group` == 'Total') %>% select(`Amount of Credit`))
+```
+
+Maximum # of Taxpayers Credit Name, Type and Year
+```{r}
+NYS_tax_credit_net_income %>% select(`Tax Year`, `Credit Type`, `Credit Name`, `ENI Group`, `Number of Taxpayers`) %>% filter(`Number of Taxpayers` == max(`Number of Taxpayers`, na.rm = T))
+```
+
+```{r}
 NYS_tax_credit_net_income %>% filter(`Credit Name` == 'Alcoholic Beverage Production Credit', `Credit Type` == 'Credit Earned')
 ```
+
+Understanding Percent of Credit field
+```{r}
+NYS_tax_credit_net_income #%>% filter(`Credit Type` == 'Credit Earned', `Credit Name` == 'Alcoholic Beverage Production Credit') %>% select(`Tax Year`, `ENI Group`, `Amount of Credit`, `Percent of Credit`)
+```
+
+Checking Credit Claimed vs Credit Earned
+```{r}
+NYS_tax_credit_net_income %>% filter(`Credit Type` %in% c('Credit Earned', 'Credit Claimed')) %>% select(`Tax Year`, `Tax Article`, `Credit Type`, `Credit Name`, `ENI Group`, `Amount of Credit`)
+```
+
+
+
+
+
+
+**Sandbox** Logistic regression for ENI dataset
+```{r}
+# income_cleaned %>% select(Name) %>% distinct()
+# for (i in income_cleaned['Name']) {
+#   income_cleaned %>% mutate(str_sub(income_cleaned[['Name']], 1, 7) = ifelse(Name == str_sub(income_cleaned[['Name']], 1, str_length(income_cleaned[['Name']]))))
+# }
+# 
+# 
+# income_cleaned %>% mutate(str_sub(income_cleaned[['Name']], 1, 7) = ifelse(Name == str_sub(income_cleaned[['Name']], 1, str_length(income_cleaned[['Name']]))))
+# ?mutate()
+# str_replace()
+# 
+# str_sub(income_cleaned[['Name']], 1, str_length(income_cleaned[['Name']]))
+# 
+# str_length(income_cleaned[['Name']])
+# 
+# str_sub(income_cleaned[['Name']], 1, 7)
+# ?str_sub()
+# 
+# income_cleaned %>% mutate(Alcohol = ifelse(Name == 'Alcoholic Beverage Production Credit', 1, 0), 
+#                           Alt_Fuels_Elec = ifelse(Name == 'Alternative Fuels and Electric Vehicle Recharging Property Credit', 1, 0), 
+#                           Alt_Fuels = ifelse(Name == 'Alternative Fuels Credit', 1, 0),
+#                           Alt_Min = ifelse(Name == 'Alternative Minimum Tax Credit', 1, 0))
+#   
+#   
+# logit.overall = glm(Avg ~ . -Amount, family = 'binomial', data = income_cleaned)
+# summary(logit.overall)
+```
+
+
 
 
 
