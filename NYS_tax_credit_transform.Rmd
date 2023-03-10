@@ -161,14 +161,133 @@ colnames(dummy_bc)
 
 ```{r}
 #Stepwise regression using BIC as the criteria (the penalty k = log(n)).
+
+#Forward BIC stepwise
 forwardBIC = step(model.empty, scope, direction = "forward", k = log(n_obs))
+fwd.BIC.summary.ENI <- data.frame(summary(forwardBIC)$coefficients)
+fwd.BIC.summary.ENI %>% arrange(rownames(fwd.BIC.summary.ENI))
+```
+
+
+```{r}
+#Backward BIC stepwise
 backwardBIC = step(model.full, scope, direction = "backward", k = log(n_obs))
+bwd.BIC.summary.ENI <- data.frame(summary(backwardBIC)$coefficients)
+bwd.BIC.summary.ENI %>% arrange(rownames(bwd.BIC.summary.ENI))
+```
+
+
+```{r}
+#inputing forwardBIC into a dataframe with index created as a column
+fwd.BIC.summary.ENI$ENI = rownames(fwd.BIC.summary.ENI)
+rownames(fwd.BIC.summary.ENI) = NULL
+fwd.BIC.summary.ENI
+```
+
+```{r}
+#inputing backwardBIC into a dataframe with index created as a column
+bwd.BIC.summary.ENI$ENI = rownames(bwd.BIC.summary.ENI)
+rownames(bwd.BIC.summary.ENI) = NULL
+bwd.BIC.summary.ENI
+```
+
+```{r}
+#comparing the forward and backward stepwise regression coefficients
+anti_join(fwd.BIC.summary.ENI, bwd.BIC.summary.ENI, by = 'ENI')
+inner_join(fwd.BIC.summary.ENI, bwd.BIC.summary.ENI, by = 'ENI')
 summary(forwardBIC)
 ```
 
 ```{r}
-income_cat_bc
+summary(backwardBIC)
+```
+
+```{r}
+#choosing backwardBIC because of negligible reduction in adjusted R^2 but we can reduce our sizable number of predictor variables.
+
+#checking our selected model's predictor variable's VIFs
+vif(backwardBIC)
+```
+
+```{r}
+summary(backwardBIC)
+bwd.BIC.formula <- backwardBIC$call[[2]]
 ```
 
 
+Splitting data up into test data and training data (test data is for year 2019, training is the rest)
+
+```{r}
+data.test <- dummy_bc %>% filter(Year == 2019)
+data.train <- dummy_bc %>% filter(Year != 2019)
+
+train.model <- lm(bwd.BIC.formula, data = data.train)
+predict(train.model, data.test)
+mean((predict(train.model, data.test)-data.test$Avg.bc)^2)
+
+data.test %>% summarise(sd(Avg.bc))
+```
+
+
+Lasso regression for comparison to backward stepwise
+```{r}
+#train
+X.train <- as.matrix(data.train %>% select(-Avg.bc))
+y.train <- as.matrix(data.train %>% select(Avg.bc))
+
+#test
+X.test <- as.matrix(data.test %>% select(-Avg.bc))
+y.test <- as.matrix(data.test %>% select(Avg.bc))
+
+X.train
+```
+
+
+```{r}
+#create lambda grid
+lambda.grid = 10^seq(2, -5, length = 100) 
+```
+
+```{r}
+#create lasso models with lambda.grid
+lasso.models = glmnet(X.train, y.train, alpha = 1, lambda = lambda.grid)
+lasso.models.coef = coef(lasso.models)
+
+#visualize coefficient shrinkage
+plot(lasso.models, xvar = "lambda", label = TRUE, main = "Lasso Regression")
+```
+
+```{r}
+#Cross Validation to find best lambda
+set.seed(0)
+cv.lasso.models <- cv.glmnet(X.train, y.train, alpha = 1, lambda = lambda.grid, nfolds = 10)
+```
+
+
+```{r}
+#visualize cross validaiton for lambda that minimizes the mean squared error.
+plot(cv.lasso.models, main = "Lasso Regression")
+```
+```{r}
+#Checking the best lambda
+log(cv.lasso.models$lambda.min)
+best.lambda <- cv.lasso.models$lambda.min
+best.lambda
+
+```
+
+```{r}
+#fitting a model with the best lambda found to be 0.000689 and using it to make predictions for the testing data.
+m_pred <- predict(lasso.models, s = best.lambda, type = "coefficients")
+m_pred
+
+lasso.best.lambda.train.pred <- predict(lasso.models, s = best.lambda, newx = X.test)
+mean((lasso.best.lambda.train.pred - y.test)^2)
+lasso.best.lambda.train
+dim(X.train)
+```
+
+```{r}
+lasso.best.lambda.train
+```
 
