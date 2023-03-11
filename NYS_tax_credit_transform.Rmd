@@ -7,6 +7,7 @@ output: html_notebook
 #Call Libraries
 library(tidyverse)
 library(caret)
+library(MASS)
 ```
 
 
@@ -83,211 +84,156 @@ income_cleaned %>% is.na() %>% sum()
 
 ```{r}
 table(income_cleaned$Num)
-income_cleaned
+write_csv(income_cleaned, 'NYS_Corp_Tax_Credit_data/income_cleaned.csv')
+```
+
+
+```{r}
+# linear.model.cleaned <- lm(Avg ~ . -Amount, data = income_cleaned)
+# summary(linear.model.cleaned)
+# plot(linear.model.cleaned)
+# income_cleaned %>% summarise(sd(Avg))
 ```
 
 ```{r}
-Avg_mean = income_cleaned %>% summarise(mean(Avg)) %>% first()
+# library(car)
+# bc = boxCox(linear.model.cleaned)
+# lambda.bc = bc$x[which(bc$y == max(bc$y))] #Extracting the best lambda value.
+# lambda.bc #best lambda was found to be -0.020202
+# 
+# income_cleaned_bc <- income_cleaned %>% mutate(Avg.bc = (Avg^lambda.bc -1)/lambda.bc) %>% select(-c(Avg, Amount))
+# income_cleaned_bc
+# model.bc = lm(Avg.bc ~ ., data = income_cleaned_bc)
+# summary(model.bc)
 
-income_cat = income_cleaned %>% mutate(y = ifelse(Avg > Avg_mean, 1, 0))
-income_cat %>% ggplot(aes(log(Num))) + geom_histogram()
-
-income_cat = income_cat %>% mutate(log_Num = log(Num))
-
+# boxcox formulas 
+# (105347^(lambda.bc)-1)/lambda.bc 
+# (10.31335*lambda.bc+1)^(1/lambda.bc)
 ```
 
 ```{r}
-linear.model.cat <- lm(Avg ~ . -y-Amount-Num, data = income_cat)
-summary(linear.model.cat)
-plot(linear.model.cat)
-```
-
-```{r}
-linear.model.cat2 <- lm(Avg ~ . -y-Amount-log_Num, data = income_cat)
-summary(linear.model.cat2)
-plot(linear.model.cat2)
-```
-
-```{r}
-library(car)
-bc = boxCox(linear.model.cat2)
-lambda = bc$x[which(bc$y == max(bc$y))] #Extracting the best lambda value.
-lambda
-
-income_cat_bc <- income_cat %>% mutate(Avg.bc = (Avg^lambda -1)/lambda) %>% select(-c(y, Avg, Amount, log_Num))
-income_cat_bc
-model.bc = lm(Avg.bc ~ ., data = income_cat_bc)
-summary(model.bc)
-```
-```{r}
-plot(model.bc)
-```
-
-```{r}
-vif(model.bc)
-influencePlot(model.bc)
-avPlots(model.bc)
-BIC(model.bc, linear.model.cat2)
+# plot(model.bc)
+# vif(model.bc)
+# influencePlot(model.bc)
+# avPlots(model.bc)
+# BIC(model.bc, linear.model.cat2)
 ```
 
 Stepwise Regression on Income_cat_bc (boxcox transformed dataset)
 ```{r}
-#creating dummy variable columns for stepwise
-x = model.matrix(Avg.bc ~., income_cat_bc)[, -1]
-dummy_bc = as.data.frame(x) %>% mutate(Avg.bc = income_cat_bc$Avg.bc)
-```
-
-```{r}
-#creating models
-model.empty = lm(Avg.bc ~ 1, data = dummy_bc) #intercept only
-model.full = lm(Avg.bc ~ ., data = dummy_bc) #All variables
-scope = list(lower = formula(model.empty), upper = formula(model.full))
-n_obs = dummy_bc %>% count() %>% first()
-```
-
-```{r}
-library(MASS) #The Modern Applied Statistics library.
-
-colnames(dummy_bc)
-
-colnames(dummy_bc) <- str_replace_all(colnames(dummy_bc), "-|'|/| |,|�" , '_')
-
-colnames(dummy_bc)[37] <- 'NameManufactureru0092s_Real_Property_Tax_Credit'
-
-colnames(dummy_bc)
-
-?str_replace()
-```
-
-```{r}
-#Stepwise regression using BIC as the criteria (the penalty k = log(n)).
-
-#Forward BIC stepwise
-forwardBIC = step(model.empty, scope, direction = "forward", k = log(n_obs))
-fwd.BIC.summary.ENI <- data.frame(summary(forwardBIC)$coefficients)
-fwd.BIC.summary.ENI %>% arrange(rownames(fwd.BIC.summary.ENI))
+# #creating dummy variable columns for stepwise
+# x = model.matrix(Avg.bc ~., income_cleaned_bc)[, -1]
+# dummy_bc = as.data.frame(x) %>% mutate(Avg.bc = income_cleaned_bc$Avg.bc)
+# 
+# #creating models
+# model.empty = lm(Avg.bc ~ 1, data = dummy_bc) #intercept only
+# model.full = lm(Avg.bc ~ ., data = dummy_bc) #All variables
+# scope = list(lower = formula(model.empty), upper = formula(model.full))
+# n_obs = dummy_bc %>% count() %>% first()
+# 
+# #cleaning column names so stepwise regression doesn't present any errors
+# colnames(dummy_bc) <- str_replace_all(colnames(dummy_bc), "-|'|/| |,|�" , '_')
+# colnames(dummy_bc)[37] <- 'NameManufactureru0092s_Real_Property_Tax_Credit'
+# colnames(dummy_bc)
 ```
 
 
 ```{r}
-#Backward BIC stepwise
-backwardBIC = step(model.full, scope, direction = "backward", k = log(n_obs))
-bwd.BIC.summary.ENI <- data.frame(summary(backwardBIC)$coefficients)
-bwd.BIC.summary.ENI %>% arrange(rownames(bwd.BIC.summary.ENI))
-```
-
-
-```{r}
-#inputing forwardBIC into a dataframe with index created as a column
-fwd.BIC.summary.ENI$ENI = rownames(fwd.BIC.summary.ENI)
-rownames(fwd.BIC.summary.ENI) = NULL
-fwd.BIC.summary.ENI
-```
-
-```{r}
-#inputing backwardBIC into a dataframe with index created as a column
-bwd.BIC.summary.ENI$ENI = rownames(bwd.BIC.summary.ENI)
-rownames(bwd.BIC.summary.ENI) = NULL
-bwd.BIC.summary.ENI
-```
-
-```{r}
-#comparing the forward and backward stepwise regression coefficients
-anti_join(fwd.BIC.summary.ENI, bwd.BIC.summary.ENI, by = 'ENI')
-inner_join(fwd.BIC.summary.ENI, bwd.BIC.summary.ENI, by = 'ENI')
-summary(forwardBIC)
-```
-
-```{r}
-summary(backwardBIC)
-```
-
-```{r}
-#choosing backwardBIC because of negligible reduction in adjusted R^2 but we can reduce our sizable number of predictor variables.
-
-#checking our selected model's predictor variable's VIFs
-vif(backwardBIC)
-```
-
-```{r}
-summary(backwardBIC)
-bwd.BIC.formula <- backwardBIC$call[[2]]
+# #Stepwise regression using BIC as the criteria (the penalty k = log(n)).
+# 
+# #Forward BIC stepwise
+# forwardBIC = step(model.empty, scope, direction = "forward", k = log(n_obs))
+# fwd.BIC.summary.ENI <- data.frame(summary(forwardBIC)$coefficients)
+# fwd.BIC.summary.ENI %>% arrange(rownames(fwd.BIC.summary.ENI))
+# 
+# #Backward BIC stepwise
+# backwardBIC = step(model.full, scope, direction = "backward", k = log(n_obs))
+# bwd.BIC.summary.ENI <- data.frame(summary(backwardBIC)$coefficients)
+# bwd.BIC.summary.ENI %>% arrange(rownames(bwd.BIC.summary.ENI))
+# 
+# summary(forwardBIC)
+# summary(backwardBIC)
+# 
+# #inputing forwardBIC into a dataframe with index created as a column
+# fwd.BIC.summary.ENI$ENI = rownames(fwd.BIC.summary.ENI)
+# rownames(fwd.BIC.summary.ENI) = NULL
+# fwd.BIC.summary.ENI
+# 
+# #inputing backwardBIC into a dataframe with index created as a column
+# bwd.BIC.summary.ENI$ENI = rownames(bwd.BIC.summary.ENI)
+# rownames(bwd.BIC.summary.ENI) = NULL
+# bwd.BIC.summary.ENI
+# 
+# #comparing the forward and backward stepwise regression coefficients
+# anti_join(fwd.BIC.summary.ENI, bwd.BIC.summary.ENI, by = 'ENI')
+# inner_join(fwd.BIC.summary.ENI, bwd.BIC.summary.ENI, by = 'ENI')
+# 
+# #choosing backwardBIC because of negligible reduction in adjusted R^2 but we can reduce our sizable number of predictor variables.
+# 
+# #checking our selected model's predictor variable's VIFs
+# vif(backwardBIC)
+# 
+# best.formula <- backwardBIC$call[[2]]
 ```
 
 
 Splitting data up into test data and training data (test data is for year 2019, training is the rest)
-
 ```{r}
-data.test <- dummy_bc %>% filter(Year == 2019)
-data.train <- dummy_bc %>% filter(Year != 2019)
-
-train.model <- lm(bwd.BIC.formula, data = data.train)
-predict(train.model, data.test)
-mean((predict(train.model, data.test)-data.test$Avg.bc)^2)
-
-data.test %>% summarise(sd(Avg.bc))
+# data.test <- dummy_bc %>% filter(Year == 2019)
+# data.train <- dummy_bc %>% filter(Year != 2019)
+# 
+# #training model based on best.formula from stepwise
+# train.model <- lm(best.formula, data = data.train)
+# summary(train.model)
+# 
+# #train
+# #X.train <- as.matrix(data.train %>% select(-Avg.bc))
+# X.train <- model.matrix(best.formula, data = data.train)[,-1]
+# y.train <- as.matrix(data.train %>% select(Avg.bc))
+# 
+# #test
+# #X.test <- as.matrix(data.test %>% select(-Avg.bc))
+# X.test <- model.matrix(best.formula, data = data.test)[,-1]
+# y.test <- as.matrix(data.test %>% select(Avg.bc))
+# dim(X.train)
+# dim(X.test)
 ```
-
 
 Lasso regression for comparison to backward stepwise
 ```{r}
-#train
-X.train <- as.matrix(data.train %>% select(-Avg.bc))
-y.train <- as.matrix(data.train %>% select(Avg.bc))
+# #create lambda grid
+# lambda.grid = 10^seq(2, -5, length = 100)
+# 
+# #create lasso models with lambda.grid
+# lasso.models = glmnet(X.train, y.train, alpha = 1, lambda = lambda.grid)
+# 
+# #visualize coefficient shrinkage
+# plot(lasso.models, xvar = "lambda", label = TRUE, main = "Lasso Regression")
+# 
+# #Cross Validation to find best lambda
+# set.seed(0)
+# cv.lasso.models <- cv.glmnet(X.train, y.train, alpha = 1, lambda = lambda.grid, nfolds = 10)
+# 
+# #visualize cross validation for lambda that minimizes the mean squared error.
+# plot(cv.lasso.models, main = "Lasso Regression")
+# 
+# #Checking the best lambda
+# log(cv.lasso.models$lambda.min)
+# best.lambda <- cv.lasso.models$lambda.min
+# best.lambda
+# # best lambda with all the variables was found to be 0.0006892612
+# # best lambda with only the bwdBIC coefficients included was found to be 0.0003053856
+# 
+# #looking at the lasso coefficients for the best.lambda
+# best.lambda.coeff <- predict(lasso.models, s = best.lambda, type = "coefficients")
+# best.lambda.coeff
+# 
+# #fitting a model with the best lambda found to be 0.000689 and using it to make predictions for the testing data.
+# lasso.best.lambda.train.pred <- predict(lasso.models, s = best.lambda, newx = X.test)
+# lasso.best.lambda.train.pred
+# 
+# #checking MSE
+# mean((lasso.best.lambda.train.pred - y.test)^2)
 
-#test
-X.test <- as.matrix(data.test %>% select(-Avg.bc))
-y.test <- as.matrix(data.test %>% select(Avg.bc))
-
-X.train
-```
-
-
-```{r}
-#create lambda grid
-lambda.grid = 10^seq(2, -5, length = 100) 
-```
-
-```{r}
-#create lasso models with lambda.grid
-lasso.models = glmnet(X.train, y.train, alpha = 1, lambda = lambda.grid)
-lasso.models.coef = coef(lasso.models)
-
-#visualize coefficient shrinkage
-plot(lasso.models, xvar = "lambda", label = TRUE, main = "Lasso Regression")
-```
-
-```{r}
-#Cross Validation to find best lambda
-set.seed(0)
-cv.lasso.models <- cv.glmnet(X.train, y.train, alpha = 1, lambda = lambda.grid, nfolds = 10)
-```
-
-
-```{r}
-#visualize cross validaiton for lambda that minimizes the mean squared error.
-plot(cv.lasso.models, main = "Lasso Regression")
-```
-```{r}
-#Checking the best lambda
-log(cv.lasso.models$lambda.min)
-best.lambda <- cv.lasso.models$lambda.min
-best.lambda
-
-```
-
-```{r}
-#fitting a model with the best lambda found to be 0.000689 and using it to make predictions for the testing data.
-m_pred <- predict(lasso.models, s = best.lambda, type = "coefficients")
-m_pred
-
-lasso.best.lambda.train.pred <- predict(lasso.models, s = best.lambda, newx = X.test)
-mean((lasso.best.lambda.train.pred - y.test)^2)
-lasso.best.lambda.train
-dim(X.train)
-```
-
-```{r}
-lasso.best.lambda.train
 ```
 
