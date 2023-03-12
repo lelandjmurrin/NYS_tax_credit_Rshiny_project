@@ -2,9 +2,8 @@
 title: "R Notebook"
 output: html_notebook
 ---
-
+Call Libraries
 ```{r} 
-#Call Libraries
 library(tidyverse)
 library(caret)
 library(MASS)
@@ -120,6 +119,7 @@ y.train <- as.matrix(data.train %>% select(Avg.bc))
 #X.test <- as.matrix(data.test %>% select(-Avg.bc))
 X.test <- model.matrix(best.formula, data = data.test)[,-1]
 y.test <- as.matrix(data.test %>% select(Avg.bc))
+
 dim(X.train)
 dim(X.test)
 ```
@@ -160,5 +160,4 @@ lasso.best.lambda.train.pred
 
 #checking MSE
 mean((lasso.best.lambda.train.pred - y.test)^2)
-
 ```

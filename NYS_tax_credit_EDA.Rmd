@@ -120,21 +120,23 @@ NYS_tax_credit_net_income %>% filter(`Credit Type` %in% c('Credit Earned', 'Cred
 
 
 Industry dataset analysis
-
 ```{r}
 dim(NYS_tax_credit_industry)
 head(NYS_tax_credit_industry)
 NYS_tax_credit_industry %>% select(`NAICS Description`) %>% distinct() #23 different industries including the Total field (therefore essentially 22)
 NYS_tax_credit_industry %>% filter(`Credit Type` == 'Credit Earned') %>% group_by(`NAICS Description`) %>% summarise(n = sum(`Number of Taxpayers`, na.rm = T)) %>% arrange(desc(n)) #Manufacturing has the greatest number of taxpayers with 20807 followed by 'Real Estate and Rental and Leasing' and 'Professional, Scientific, and Technical Services' with 11811 and 5117 respectively. 
 
-NYS_tax_credit_industry %>% filter(`Credit Type` == 'Credit Earned') %>% group_by(`NAICS Description`) %>% summarise(n = sum(`Number of Taxpayers`, na.rm = T), credit = sum(`Amount of Credit`, na.rm = T)) %>% mutate(ratio = credit/n) %>% arrange(desc(ratio))
+NYS_tax_credit_industry %>% filter(`Credit Type` == 'Credit Earned') %>% group_by(`NAICS Description`) %>% summarise(Num = sum(`Number of Taxpayers`, na.rm = T), Amount = sum(`Amount of Credit`, na.rm = T)) %>% mutate(Avg = Amount/Num) %>% arrange(desc(Avg)) #displaying Avg amount of credit earned per taxpayer per industry
 ```
+
 ```{r}
 plot(NYS_tax_credit_industry)
 plot(NYS_tax_credit_industry %>% select(`Tax Year`, `Credit Name`, `Number of Taxpayers`, `Amount of Credit`))
 ```
 
 ```{r}
-head(NYS_tax_credit_taxation_basis)
+summary(NYS_tax_credit_industry)
+NYS_tax_credit_industry %>% filter(is.na(`Number of Taxpayers`)) #4003 records with NAs for Number of Taxpayers, Amount of Credit, Percent of Credit, Mean Amount of Credit
+
 ```
 

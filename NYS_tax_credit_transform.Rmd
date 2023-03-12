@@ -19,12 +19,26 @@ NYS_tax_credit_taxation_basis <- read_csv('NYS_Corp_Tax_Credit_data/NYS_tax_cred
 NYS_tax_credit_industry <- read_csv('NYS_Corp_Tax_Credit_data/NYS_tax_credit_industry.csv')
 ```
 
-Cleaning the Dataset
+Cleaning the Datasets
 ```{r}
-net_income_earned_total <- NYS_tax_credit_net_income %>% filter(`ENI Group` == 'Total', `Credit Type` == 'Credit Earned') %>% select(Year = `Tax Year`, Name = `Credit Name`, Num = `Number of Taxpayers`, Amount = `Amount of Credit`)
-net_income_earned_total %>% filter(is.na(Amount))
+colnames(NYS_tax_credit_net_income)[5] <- 'Group'
+colnames(NYS_tax_credit_net_income)
 
-#NYS_tax_credit_net_income %>% select(-c(12,13)) %>% filter(`Credit Type` == 'Credit Earned') %>% pivot_wider(names_from = `ENI Group`, values_from = `Number of Taxpayers`)
+colnames(NYS_tax_credit_industry)[5] <- 'Group'
+colnames(NYS_tax_credit_industry)
+
+filter_total_func <- function (df) {
+  return (df %>% filter(`Group` == 'Total', `Credit Type` == 'Credit Earned') %>% select(Year = `Tax Year`, Name = `Credit Name`, Num = `Number of Taxpayers`, Amount = `Amount of Credit`))
+}
+
+#ENI Group dataset
+net_income_earned_total <- NYS_tax_credit_net_income %>% filter_total_func()
+net_income_earned_total
+
+#Industry dataset
+industry_earned_total <- NYS_tax_credit_industry %>% filter_total_func()
+industry_earned_total
+
 ```
 
 ```{r}
