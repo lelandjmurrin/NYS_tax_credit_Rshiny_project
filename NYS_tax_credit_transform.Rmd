@@ -3,16 +3,15 @@ title: "R Notebook"
 output: html_notebook
 ---
 
+Call Libraries
 ```{r} 
-#Call Libraries
 library(tidyverse)
 library(caret)
 library(MASS)
 ```
 
-
+Load Datasets
 ```{r}
-#Load Datasets
 NYS_tax_credit_used <- read_csv('NYS_Corp_Tax_Credit_data/NYS_tax_credit_used.csv')
 NYS_tax_credit_net_income <- read_csv('NYS_Corp_Tax_Credit_data/NYS_tax_credit_net_income.csv')
 NYS_tax_credit_taxation_basis <- read_csv('NYS_Corp_Tax_Credit_data/NYS_tax_credit_taxation_basis.csv')
@@ -22,232 +21,95 @@ NYS_tax_credit_industry <- read_csv('NYS_Corp_Tax_Credit_data/NYS_tax_credit_ind
 Cleaning the Datasets
 ```{r}
 colnames(NYS_tax_credit_net_income)[5] <- 'Group'
-colnames(NYS_tax_credit_net_income)
 
 colnames(NYS_tax_credit_industry)[5] <- 'Group'
-colnames(NYS_tax_credit_industry)
 
 filter_total_func <- function (df) {
-  return (df %>% filter(`Group` == 'Total', `Credit Type` == 'Credit Earned') %>% select(Year = `Tax Year`, Name = `Credit Name`, Num = `Number of Taxpayers`, Amount = `Amount of Credit`))
+  return (df %>% 
+            filter(Group == 'Total', 
+                   `Credit Type` == 'Credit Earned') %>% 
+            select(Year = `Tax Year`, 
+                   Name = `Credit Name`, 
+                   Num = `Number of Taxpayers`, 
+                   Amount = `Amount of Credit`))
 }
 
-#ENI Group dataset
+#Net Income Group Dataset
 net_income_earned_total <- NYS_tax_credit_net_income %>% filter_total_func()
 net_income_earned_total
 
-#Industry dataset
+#Industry Group Dataset
 industry_earned_total <- NYS_tax_credit_industry %>% filter_total_func()
 industry_earned_total
-
 ```
 
 ```{r}
-net_income_earned <- NYS_tax_credit_net_income %>% filter(`ENI Group` != 'Total', `Credit Type` == 'Credit Earned') %>% select(Year = `Tax Year`, Name = `Credit Name`, ENI = `ENI Group`, Num = `Number of Taxpayers`, Amount = `Amount of Credit`)
+filter_group_func <- function (df) {
+  return (df %>% 
+            filter(Group != 'Total', 
+                   `Credit Type` == 'Credit Earned') %>% 
+            select(Year = `Tax Year`, 
+                   Name = `Credit Name`, 
+                   Group, 
+                   Num = `Number of Taxpayers`, 
+                   Amount = `Amount of Credit`))
+}
 
+#Net Income Group Dataset
+net_income_earned <- NYS_tax_credit_net_income %>% filter_group_func()
 net_income_earned
 
-net_income_earned %>% group_by(Year, Name) %>% mutate(e_total_num = sum(Num, na.rm = T), e_total_amount = sum(Amount, na.rm = T)) %>% filter(is.na(e_total_num))
-
+#Industry Group Dataset
+industry_earned <- NYS_tax_credit_industry %>% filter_group_func()
+industry_earned
 ```
 
-```{r}
-# inner_join(net_income_earned, net_income_earned_total, by = c('Year', 'Name'), suffix = c('_e', '_t')) %>% 
-#   group_by(Year, Name) %>% 
-#   mutate(e_total_num = sum(Num_e, na.rm = T), 
-#          e_total_amount = sum(Amount_e, na.rm = T), 
-#          Num_missing = sum(is.na(Num_e))) %>%
-#   mutate(Num_e = ifelse(is.na(Num_e), (Num_t-e_total_num)/Num_missing, Num_e))
-# 
-# #%>%
-#  # filter(is.na(Num_t), e_total_amount > 0)
-# 
-# 
-# 
-# (Num_t-e_total_num)/Num_missing
-# 
-# 
-# #sum(is.na(c(NA,NA,1)))
-
-```
-
-
-Imputing Credit Earned Data
+Joining datasets, Filtering and Imputing missing values
 ```{r}
 nasum <- function (x) {
   return (sum(is.na(x)))
 }
-#nasum(c(NA, 1, 2, 3, NA, 0))
+
+join_total_func <- function(df_e, df_t) {
+          return(inner_join(df_e, 
+                             df_t, 
+                             by = c('Year', 'Name'), 
+                             suffix = c('_e', '_t')) %>% 
+                  #filter out all year/name combos that have total taxpayers equal to 0 or NA.
+                  filter(!is.na(Num_t),
+                          Num_t != 0) %>% 
+                  group_by(Year, Name) %>% 
+                  #Taking difference between reported total num of taxpayers (Num_t) and expected num of taxpayers (Num_e). 
+                  #Distributing this evenly accross the NAs in expected num of taxpayers. The same is done for the Amount of Credit.
+                  mutate(impute_num = (Num_t-sum(Num_e, na.rm = T))/nasum(Num_e), 
+                          impute_amt = (Amount_t-sum(Amount_e, na.rm = T))/nasum(Amount_e)) %>%
+                  mutate(Num_e = ifelse(is.na(Num_e), impute_num, Num_e), 
+                          Amount_e = ifelse(is.na(Amount_e), impute_amt, Amount_e)) %>% #Imputing here.
+                  select(Year, 
+                         Name, 
+                         Group, 
+                         Num = Num_e, 
+                         Amount = Amount_e) %>%
+                  filter(Num != 0) %>%
+                  mutate(Avg = Amount/Num) %>% #Calculated the average amount of credit earned per taxpayer (Avg) and being careful not to divide by 0.
+                  ungroup()
+         )
+}
+
+#Net Income Group Dataset cleaned
+income_cleaned <- join_total_func(net_income_earned, net_income_earned_total)
+
+#Industry Group Dataset cleaned
+industry_cleaned <- join_total_func(industry_earned, industry_earned_total)
 ```
 
+Writing the final cleaned dataset to a csv file for ensuing regression analysis
 ```{r}
-income_cleaned <- inner_join(net_income_earned, net_income_earned_total, by = c('Year', 'Name'), suffix = c('_e', '_t')) %>% 
-  filter(!is.na(Num_t), Num_t != 0) %>%
-  group_by(Year, Name) %>%
-  #mutate(impute_num = ifelse(nasum(Num_e) == 0, 0, (Num_t-sum(Num_e, na.rm = T))/nasum(Num_e)),
-  #      impute_amt = ifelse(nasum(Amount_e) == 0, 0, (Amount_t-sum(Amount_e, na.rm = T))/nasum(Amount_e)))
-  mutate(impute_num = (Num_t-sum(Num_e, na.rm = T))/nasum(Num_e),
-         impute_amt = (Amount_t-sum(Amount_e, na.rm = T))/nasum(Amount_e)) %>%
-  mutate(Num_e = ifelse(is.na(Num_e), impute_num, Num_e), Amount_e = ifelse(is.na(Amount_e), impute_amt, Amount_e)) %>%
-  select(Year, Name, ENI, Num = Num_e, Amount = Amount_e) %>%
-  mutate(Avg = ifelse(Num == 0, 0, Amount/Num)) %>%
-  filter(Num != 0) %>%
-  ungroup()
-
-income_cleaned %>% is.na() %>% sum()
-```
-
-```{r}
-table(income_cleaned$Num)
+write_csv(industry_cleaned, 'NYS_Corp_Tax_Credit_data/industry_cleaned.csv')
 write_csv(income_cleaned, 'NYS_Corp_Tax_Credit_data/income_cleaned.csv')
 ```
 
 
-```{r}
-# linear.model.cleaned <- lm(Avg ~ . -Amount, data = income_cleaned)
-# summary(linear.model.cleaned)
-# plot(linear.model.cleaned)
-# income_cleaned %>% summarise(sd(Avg))
-```
-
-```{r}
-# library(car)
-# bc = boxCox(linear.model.cleaned)
-# lambda.bc = bc$x[which(bc$y == max(bc$y))] #Extracting the best lambda value.
-# lambda.bc #best lambda was found to be -0.020202
-# 
-# income_cleaned_bc <- income_cleaned %>% mutate(Avg.bc = (Avg^lambda.bc -1)/lambda.bc) %>% select(-c(Avg, Amount))
-# income_cleaned_bc
-# model.bc = lm(Avg.bc ~ ., data = income_cleaned_bc)
-# summary(model.bc)
-
-# boxcox formulas 
-# (105347^(lambda.bc)-1)/lambda.bc 
-# (10.31335*lambda.bc+1)^(1/lambda.bc)
-```
-
-```{r}
-# plot(model.bc)
-# vif(model.bc)
-# influencePlot(model.bc)
-# avPlots(model.bc)
-# BIC(model.bc, linear.model.cat2)
-```
-
-Stepwise Regression on Income_cat_bc (boxcox transformed dataset)
-```{r}
-# #creating dummy variable columns for stepwise
-# x = model.matrix(Avg.bc ~., income_cleaned_bc)[, -1]
-# dummy_bc = as.data.frame(x) %>% mutate(Avg.bc = income_cleaned_bc$Avg.bc)
-# 
-# #creating models
-# model.empty = lm(Avg.bc ~ 1, data = dummy_bc) #intercept only
-# model.full = lm(Avg.bc ~ ., data = dummy_bc) #All variables
-# scope = list(lower = formula(model.empty), upper = formula(model.full))
-# n_obs = dummy_bc %>% count() %>% first()
-# 
-# #cleaning column names so stepwise regression doesn't present any errors
-# colnames(dummy_bc) <- str_replace_all(colnames(dummy_bc), "-|'|/| |,|�" , '_')
-# colnames(dummy_bc)[37] <- 'NameManufactureru0092s_Real_Property_Tax_Credit'
-# colnames(dummy_bc)
-```
 
 
-```{r}
-# #Stepwise regression using BIC as the criteria (the penalty k = log(n)).
-# 
-# #Forward BIC stepwise
-# forwardBIC = step(model.empty, scope, direction = "forward", k = log(n_obs))
-# fwd.BIC.summary.ENI <- data.frame(summary(forwardBIC)$coefficients)
-# fwd.BIC.summary.ENI %>% arrange(rownames(fwd.BIC.summary.ENI))
-# 
-# #Backward BIC stepwise
-# backwardBIC = step(model.full, scope, direction = "backward", k = log(n_obs))
-# bwd.BIC.summary.ENI <- data.frame(summary(backwardBIC)$coefficients)
-# bwd.BIC.summary.ENI %>% arrange(rownames(bwd.BIC.summary.ENI))
-# 
-# summary(forwardBIC)
-# summary(backwardBIC)
-# 
-# #inputing forwardBIC into a dataframe with index created as a column
-# fwd.BIC.summary.ENI$ENI = rownames(fwd.BIC.summary.ENI)
-# rownames(fwd.BIC.summary.ENI) = NULL
-# fwd.BIC.summary.ENI
-# 
-# #inputing backwardBIC into a dataframe with index created as a column
-# bwd.BIC.summary.ENI$ENI = rownames(bwd.BIC.summary.ENI)
-# rownames(bwd.BIC.summary.ENI) = NULL
-# bwd.BIC.summary.ENI
-# 
-# #comparing the forward and backward stepwise regression coefficients
-# anti_join(fwd.BIC.summary.ENI, bwd.BIC.summary.ENI, by = 'ENI')
-# inner_join(fwd.BIC.summary.ENI, bwd.BIC.summary.ENI, by = 'ENI')
-# 
-# #choosing backwardBIC because of negligible reduction in adjusted R^2 but we can reduce our sizable number of predictor variables.
-# 
-# #checking our selected model's predictor variable's VIFs
-# vif(backwardBIC)
-# 
-# best.formula <- backwardBIC$call[[2]]
-```
-
-
-Splitting data up into test data and training data (test data is for year 2019, training is the rest)
-```{r}
-# data.test <- dummy_bc %>% filter(Year == 2019)
-# data.train <- dummy_bc %>% filter(Year != 2019)
-# 
-# #training model based on best.formula from stepwise
-# train.model <- lm(best.formula, data = data.train)
-# summary(train.model)
-# 
-# #train
-# #X.train <- as.matrix(data.train %>% select(-Avg.bc))
-# X.train <- model.matrix(best.formula, data = data.train)[,-1]
-# y.train <- as.matrix(data.train %>% select(Avg.bc))
-# 
-# #test
-# #X.test <- as.matrix(data.test %>% select(-Avg.bc))
-# X.test <- model.matrix(best.formula, data = data.test)[,-1]
-# y.test <- as.matrix(data.test %>% select(Avg.bc))
-# dim(X.train)
-# dim(X.test)
-```
-
-Lasso regression for comparison to backward stepwise
-```{r}
-# #create lambda grid
-# lambda.grid = 10^seq(2, -5, length = 100)
-# 
-# #create lasso models with lambda.grid
-# lasso.models = glmnet(X.train, y.train, alpha = 1, lambda = lambda.grid)
-# 
-# #visualize coefficient shrinkage
-# plot(lasso.models, xvar = "lambda", label = TRUE, main = "Lasso Regression")
-# 
-# #Cross Validation to find best lambda
-# set.seed(0)
-# cv.lasso.models <- cv.glmnet(X.train, y.train, alpha = 1, lambda = lambda.grid, nfolds = 10)
-# 
-# #visualize cross validation for lambda that minimizes the mean squared error.
-# plot(cv.lasso.models, main = "Lasso Regression")
-# 
-# #Checking the best lambda
-# log(cv.lasso.models$lambda.min)
-# best.lambda <- cv.lasso.models$lambda.min
-# best.lambda
-# # best lambda with all the variables was found to be 0.0006892612
-# # best lambda with only the bwdBIC coefficients included was found to be 0.0003053856
-# 
-# #looking at the lasso coefficients for the best.lambda
-# best.lambda.coeff <- predict(lasso.models, s = best.lambda, type = "coefficients")
-# best.lambda.coeff
-# 
-# #fitting a model with the best lambda found to be 0.000689 and using it to make predictions for the testing data.
-# lasso.best.lambda.train.pred <- predict(lasso.models, s = best.lambda, newx = X.test)
-# lasso.best.lambda.train.pred
-# 
-# #checking MSE
-# mean((lasso.best.lambda.train.pred - y.test)^2)
-
-```
 

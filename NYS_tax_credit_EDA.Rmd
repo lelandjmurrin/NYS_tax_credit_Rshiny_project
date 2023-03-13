@@ -137,6 +137,5 @@ plot(NYS_tax_credit_industry %>% select(`Tax Year`, `Credit Name`, `Number of Ta
 ```{r}
 summary(NYS_tax_credit_industry)
 NYS_tax_credit_industry %>% filter(is.na(`Number of Taxpayers`)) #4003 records with NAs for Number of Taxpayers, Amount of Credit, Percent of Credit, Mean Amount of Credit
-
 ```
 

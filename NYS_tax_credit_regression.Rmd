@@ -8,6 +8,7 @@ library(tidyverse)
 library(caret)
 library(MASS)
 library(car)
+library(moments)
 ```
 
 
@@ -15,20 +16,64 @@ Calling the Transformed Datasets
 ```{r}
 income_cleaned = read_csv('NYS_Corp_Tax_Credit_data/income_cleaned.csv')
 income_cleaned
+industry_cleaned = read_csv('NYS_Corp_Tax_Credit_data/industry_cleaned.csv')
+industry_cleaned
 ```
 
 
 Creating the Models
 ```{r}
-linear.model.cleaned <- lm(Avg ~ . -Amount, data = income_cleaned)
-summary(linear.model.cleaned)
-plot(linear.model.cleaned)
+sat.model.summary <- function (df, field){
+    
+    f = as.formula(paste(field,' ~ . - Amount'))
+    
+    #Shapiro-Wilks test to evaluate normality
+    print(shapiro.test(df[[field]]))
+    
+    #Kurtosis evaluation (normal distribution has a value close to 3)
+    print(kurtosis(df[[field]]))
+    linear.model.cleaned <- lm(f, data = df)
+    print(summary(linear.model.cleaned))
+    plot(linear.model.cleaned)
+    
+    #histograms of response variable to check distribution
+    print(df %>% 
+      ggplot(aes_string(field)) + 
+      geom_histogram() + 
+      labs(title = 'Average Credit Amount Distribution') + 
+      theme(plot.title = element_text(hjust = 0.5))) 
+
+    return (linear.model.cleaned)
+}
+
+income.lm.cleaned <- sat.model.summary(income_cleaned, 'Avg')
+industry.lm.cleaned <- sat.model.summary(industry_cleaned, 'Avg')
 ```
 
 ```{r}
-bc = boxCox(linear.model.cleaned)
+# linear.model.cleaned2 <- lm(Avg ~ . - Amount, data = income_cleaned)
+# s = summary(linear.model.cleaned)
+# show(s)
+# plot(linear.model.cleaned)
+# 
+# #histograms of response variable to check distribution
+# hist(income_cleaned$Avg)
+# hist(income_cleaned_bc$Avg.bc)
+# 
+# #Shapiro-Wilks test to evaluate normality
+# shapiro.test(income_cleaned$Avg)
+# shapiro.test(income_cleaned_bc$Avg.bc)
+# 
+# #Kurtosis evaluation (normal distribution has a value close to 3)
+# moments::kurtosis(income_cleaned$Avg)
+# moments::kurtosis(income_cleaned_bc$Avg.bc) #evaluated to 2.75 which means very close to 3 so it is normally distributed with possibly slightly less outliers. 
+```
+
+Correcting violation of Normality in previous model with BoxCox transform
+```{r}
+bc = boxCox(income.lm.cleaned, lambda = seq(-0.2, 0.2, 1/10))
 lambda.bc = bc$x[which(bc$y == max(bc$y))] #Extracting the best lambda value.
-lambda.bc #best lambda was found to be -0.020202
+lambda.bc #best lambda was found to be -0.020202 with confidence interval that doesn't include 0 or 1 therefore the (y^lambda-1)/lambda transform is appropriate
 
 income_cleaned_bc <- income_cleaned %>% mutate(Avg.bc = (Avg^lambda.bc -1)/lambda.bc) %>% select(-c(Avg, Amount))
 income_cleaned_bc
@@ -161,3 +206,8 @@ lasso.best.lambda.train.pred
 #checking MSE
 mean((lasso.best.lambda.train.pred - y.test)^2)
 ```
+
+```{r}
+as.data.frame(lasso.best.lambda.train.pred) %>% mutate(Avg_in_dollars = (lasso.best.lambda.train.pred*lambda.bc+1)^(1/lambda.bc))
+```
+
