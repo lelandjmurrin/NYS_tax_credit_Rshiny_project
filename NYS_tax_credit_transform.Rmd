@@ -112,4 +112,3 @@ write_csv(income_cleaned, 'NYS_Corp_Tax_Credit_data/income_cleaned.csv')
 
 
 
-
