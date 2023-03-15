@@ -148,7 +148,10 @@ colnames(income.dummy.bc)
 industry.dummy.bc <- dummy_func(industry_cleaned_bc)
 colnames(industry.dummy.bc)[35] <- 'NameManufactureru0092s_Real_Property_Tax_Credit'
 colnames(industry.dummy.bc)
+```
 
+Stepwise regression using BIC as the criteria (the penalty k = log(n)).
+```{r}
 #creating models
 bcs = list(income = income.dummy.bc, industry = industry.dummy.bc)
 bcs[['industry']]
@@ -166,114 +169,187 @@ for (i in k){
   forwardBIC[[i]] = step(model.empty, scope, direction = "forward", k = log(n_obs))
   backwardBIC[[i]] = step(model.full, scope, direction = "backward", k = log(n_obs))
 }
+```
 
-for (i in k){
-  fwd.BIC.summary.ENI <- data.frame(summary(forwardBIC)$coefficients)
-  fwd.BIC.summary.ENI %>% arrange(rownames(fwd.BIC.summary.ENI)) #next time
+Selecting Best Formula per Dataset from Stepwise Regressions
+```{r}
+bic_func <- function (BIC.model){
+  BIC.coeff <- data.frame(summary(BIC.model)$coefficients) 
+  print(BIC.coeff %>% arrange(rownames(BIC.coeff)))
+  print(summary(BIC.model))
+  print(vif(BIC.model))
 }
-summary(forwardBIC[['income']])$coefficients
+
+bic_func(backwardBIC[['industry']])
+bic_func(forwardBIC[['industry']])
+
+#Income Group Dataset
+income.best.formula <- backwardBIC[['income']]$call[[2]]
+income.best.formula
+
+#Industry Group Dataset
+industry.best.formula <- forwardBIC[['industry']]$call[[2]]
+industry.best.formula
 ```
 
 Stepwise regression using BIC as the criteria (the penalty k = log(n)).
 ```{r}
-#Forward BIC stepwise
-forwardBIC = step(model.empty, scope, direction = "forward", k = log(n_obs))
-fwd.BIC.summary.ENI <- data.frame(summary(forwardBIC)$coefficients)
-fwd.BIC.summary.ENI %>% arrange(rownames(fwd.BIC.summary.ENI))
-
-#Backward BIC stepwise
-backwardBIC = step(model.full, scope, direction = "backward", k = log(n_obs))
-bwd.BIC.summary.ENI <- data.frame(summary(backwardBIC)$coefficients)
-bwd.BIC.summary.ENI %>% arrange(rownames(bwd.BIC.summary.ENI))
-
-summary(forwardBIC)
-summary(backwardBIC)
-
-#inputing forwardBIC into a dataframe with index created as a column
-fwd.BIC.summary.ENI$ENI = rownames(fwd.BIC.summary.ENI)
-rownames(fwd.BIC.summary.ENI) = NULL
-fwd.BIC.summary.ENI
-
-#inputing backwardBIC into a dataframe with index created as a column
-bwd.BIC.summary.ENI$ENI = rownames(bwd.BIC.summary.ENI)
-rownames(bwd.BIC.summary.ENI) = NULL
-bwd.BIC.summary.ENI
-
-#comparing the forward and backward stepwise regression coefficients
-anti_join(fwd.BIC.summary.ENI, bwd.BIC.summary.ENI, by = 'ENI')
-inner_join(fwd.BIC.summary.ENI, bwd.BIC.summary.ENI, by = 'ENI')
-
-#choosing backwardBIC because of negligible reduction in adjusted R^2 but we can reduce our sizable number of predictor variables.
-
-#checking our selected model's predictor variable's VIFs
-vif(backwardBIC)
-
-best.formula <- backwardBIC$call[[2]]
+# #Forward BIC stepwise
+# forwardBIC = step(model.empty, scope, direction = "forward", k = log(n_obs))
+# fwd.BIC.summary.ENI <- data.frame(summary(forwardBIC)$coefficients)
+# fwd.BIC.summary.ENI %>% arrange(rownames(fwd.BIC.summary.ENI))
+# 
+# #Backward BIC stepwise
+# backwardBIC = step(model.full, scope, direction = "backward", k = log(n_obs))
+# bwd.BIC.summary.ENI <- data.frame(summary(backwardBIC)$coefficients)
+# bwd.BIC.summary.ENI %>% arrange(rownames(bwd.BIC.summary.ENI))
+# 
+# summary(forwardBIC)
+# summary(backwardBIC)
+# 
+# #inputing forwardBIC into a dataframe with index created as a column
+# fwd.BIC.summary.ENI$ENI = rownames(fwd.BIC.summary.ENI)
+# rownames(fwd.BIC.summary.ENI) = NULL
+# fwd.BIC.summary.ENI
+# 
+# #inputing backwardBIC into a dataframe with index created as a column
+# bwd.BIC.summary.ENI$ENI = rownames(bwd.BIC.summary.ENI)
+# rownames(bwd.BIC.summary.ENI) = NULL
+# bwd.BIC.summary.ENI
+# 
+# #comparing the forward and backward stepwise regression coefficients
+# anti_join(fwd.BIC.summary.ENI, bwd.BIC.summary.ENI, by = 'ENI')
+# inner_join(fwd.BIC.summary.ENI, bwd.BIC.summary.ENI, by = 'ENI')
+# 
+# #choosing backwardBIC because of negligible reduction in adjusted R^2 but we can reduce our sizable number of predictor variables.
+# 
+# #checking our selected model's predictor variable's VIFs
+# vif(backwardBIC)
+# 
+# best.formula <- backwardBIC$call[[2]]
 ```
 
 
 Splitting data up into test data and training data (test data is for year 2019, training is the rest)
 ```{r}
-data.test <- dummy_bc %>% filter(Year == 2019)
-data.train <- dummy_bc %>% filter(Year != 2019)
+test_train_split <- function(dummy_bc, best.formula) {
+  data.test <- dummy_bc %>% filter(Year == 2019)
+  data.train <- dummy_bc %>% filter(Year != 2019)
+  
+  #train
+  #X.train <- as.matrix(data.train %>% select(-Avg.bc))
+  X.train <- model.matrix(best.formula, data = data.train)[,-1]
+  y.train <- as.matrix(data.train %>% select(Avg.bc))
 
-#training model based on best.formula from stepwise
-train.model <- lm(best.formula, data = data.train)
-summary(train.model)
+  #test
+  #X.test <- as.matrix(data.test %>% select(-Avg.bc))
+  X.test <- model.matrix(best.formula, data = data.test)[,-1]
+  y.test <- as.matrix(data.test %>% select(Avg.bc))
+  return (list('X.train' = X.train, 'y.train' = y.train, 'X.test' = X.test, 'y.test' = y.test))
+}
 
-#train
-#X.train <- as.matrix(data.train %>% select(-Avg.bc))
-X.train <- model.matrix(best.formula, data = data.train)[,-1]
-y.train <- as.matrix(data.train %>% select(Avg.bc))
 
-#test
-#X.test <- as.matrix(data.test %>% select(-Avg.bc))
-X.test <- model.matrix(best.formula, data = data.test)[,-1]
-y.test <- as.matrix(data.test %>% select(Avg.bc))
+income.data.split <- test_train_split(income.dummy.bc, income.best.formula)
+income.data.split[['y.train']]
 
-dim(X.train)
-dim(X.test)
+industry.data.split <- test_train_split(industry.dummy.bc, industry.best.formula)
+
+# data.test <- dummy_bc %>% filter(Year == 2019)
+# data.train <- dummy_bc %>% filter(Year != 2019)
+# 
+# #training model based on best.formula from stepwise
+# train.model <- lm(best.formula, data = data.train)
+# summary(train.model)
+# 
+# #train
+# #X.train <- as.matrix(data.train %>% select(-Avg.bc))
+# X.train <- model.matrix(best.formula, data = data.train)[,-1]
+# y.train <- as.matrix(data.train %>% select(Avg.bc))
+# 
+# #test
+# #X.test <- as.matrix(data.test %>% select(-Avg.bc))
+# X.test <- model.matrix(best.formula, data = data.test)[,-1]
+# y.test <- as.matrix(data.test %>% select(Avg.bc))
+# 
+# dim(X.train)
+# dim(X.test)
 ```
 
 
 Lasso regression for comparison to backward stepwise
 ```{r}
-#create lambda grid
-lambda.grid = 10^seq(2, -5, length = 100)
+calc_MSE <- function (model, x.test, y.test){
+  y.predict <- predict(model, newdata = x.test)
+  return(mean((y.predict - y.test)^2))
+}
 
-#create lasso models with lambda.grid
-lasso.models = glmnet(X.train, y.train, alpha = 1, lambda = lambda.grid)
+xy.sat.splits <- list('income' = income.dummy.bc, 'industry' = industry.dummy.bc)
+xy.splits <- list('income' = income.data.split, 'industry' = industry.data.split)
 
-#visualize coefficient shrinkage
-plot(lasso.models, xvar = "lambda", label = TRUE, main = "Lasso Regression")
+for (i in k){
+  X.train <- xy.splits[[i]][['X.train']]
+  y.train <- xy.splits[[i]][['y.train']]
+  X.test <- xy.splits[[i]][['X.test']]
+  y.test <- xy.splits[[i]][['y.test']]
+  
+  #create lambda grid
+  lambda.grid = 10^seq(2, -5, length = 100)
+  
+  #create lasso models with lambda.grid
+  lasso.models = glmnet(X.train, y.train, alpha = 1, lambda = lambda.grid)
+  
+  #visualize coefficient shrinkage
+  plot(lasso.models, xvar = "lambda", label = TRUE, main = paste("Lasso Regression:", i))
+  
+  #Cross Validation to find best lambda
+  set.seed(0)
+  cv.lasso.models <- cv.glmnet(X.train, y.train, alpha = 1, lambda = lambda.grid, nfolds = 10)
+  
+  #visualize cross validation for lambda that minimizes the mean squared error.
+  plot(cv.lasso.models, main = paste("Lasso Regression:", i))
+  
+  #Checking the best lambda
+  log(cv.lasso.models$lambda.min)
+  best.lambda <- cv.lasso.models$lambda.min
+  print(paste(i, ' best.lambda:', best.lambda))
+  # best lambda with all the variables was found to be 0.0006892612
+  # best lambda with only the bwdBIC coefficients included was found to be 0.0003053856
+  
+  #looking at the lasso coefficients for the best.lambda
+  best.lambda.coeff <- predict(lasso.models, s = best.lambda, type = "coefficients")
+  print(best.lambda.coeff)
+  
+  #fitting a model with the best lambda found to be 0.000689 and using it to make predictions for the testing data.
+  lasso.best.lambda.train.pred <- predict(lasso.models, s = best.lambda, newx = X.test)
+  lasso.best.lambda.train.pred
+  
+  #checking MSE
+  MSE.lasso <- mean((lasso.best.lambda.train.pred - y.test)^2)
+  sat.data.split <- test_train_split(xy.sat.splits[[i]], Avg.bc ~ .)
+  sat.model.bc <- lm(Avg.bc ~., data = as.data.frame(cbind(sat.data.split[['X.train']], sat.data.split[['y.train']])))
+  MSE.sat <- calc_MSE(sat.model.bc, as.data.frame(sat.data.split[['X.test']]), sat.data.split[['y.test']])
+  
+  print(paste(i, ' Lasso MSE: ', MSE.lasso, ' Saturated MSE: ', MSE.sat))
+}
 
-#Cross Validation to find best lambda
-set.seed(0)
-cv.lasso.models <- cv.glmnet(X.train, y.train, alpha = 1, lambda = lambda.grid, nfolds = 10)
-
-#visualize cross validation for lambda that minimizes the mean squared error.
-plot(cv.lasso.models, main = "Lasso Regression")
-
-#Checking the best lambda
-log(cv.lasso.models$lambda.min)
-best.lambda <- cv.lasso.models$lambda.min
-best.lambda
-# best lambda with all the variables was found to be 0.0006892612
-# best lambda with only the bwdBIC coefficients included was found to be 0.0003053856
-
-#looking at the lasso coefficients for the best.lambda
-best.lambda.coeff <- predict(lasso.models, s = best.lambda, type = "coefficients")
-best.lambda.coeff
-
-#fitting a model with the best lambda found to be 0.000689 and using it to make predictions for the testing data.
-lasso.best.lambda.train.pred <- predict(lasso.models, s = best.lambda, newx = X.test)
-lasso.best.lambda.train.pred
-
-#checking MSE
-mean((lasso.best.lambda.train.pred - y.test)^2)
 ```
 
 ```{r}
+1.47368550172763
 as.data.frame(lasso.best.lambda.train.pred) %>% mutate(Avg_in_dollars = (lasso.best.lambda.train.pred*lambda.bc+1)^(1/lambda.bc))
+```
+
+```{r}
+income.sat.data.split <- test_train_split(income.dummy.bc, Avg.bc ~ .)
+income.sat.data.split[['X.train']]
+
+sat.model.bc <- lm(Avg.bc ~., data = as.data.frame(cbind(income.sat.data.split[['X.train']], income.sat.data.split[['y.train']])))
+summary(sat.model.bc)
+
+calc_MSE(sat.model.bc, as.data.frame(income.sat.data.split[['X.test']]), income.sat.data.split[['y.test']])
+
+
+sat.y.predict <- predict(sat.model.bc, newdata = as.data.frame(income.sat.data.split[['X.test']]))
+mean((sat.y.predict - income.sat.data.split[['y.test']])^2)
 ```
 
