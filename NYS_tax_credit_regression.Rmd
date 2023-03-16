@@ -335,7 +335,6 @@ for (i in k){
 ```
 
 ```{r}
-1.47368550172763
 as.data.frame(lasso.best.lambda.train.pred) %>% mutate(Avg_in_dollars = (lasso.best.lambda.train.pred*lambda.bc+1)^(1/lambda.bc))
 ```
 

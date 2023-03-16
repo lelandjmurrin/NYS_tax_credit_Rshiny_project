@@ -17,6 +17,13 @@ NYS_tax_credit_net_income <- read_csv('NYS_Corp_Tax_Credit_data/NYS_tax_credit_n
 NYS_tax_credit_taxation_basis <- read_csv('NYS_Corp_Tax_Credit_data/NYS_tax_credit_taxation_basis.csv')
 NYS_tax_credit_industry <- read_csv('NYS_Corp_Tax_Credit_data/NYS_tax_credit_industry.csv')
 ```
+Cleaning up Credit
+```{r}
+NYS_tax_credit_industry %>% select(`Credit Name`) %>% distinct() %>% arrange(`Credit Name`)
+NYS_tax_credit_net_income %>% select(`Credit Name`) %>% distinct() %>% arrange(`Credit Name`)
+
+NYS_tax_credit_net_income %>% mutate(`Credit Name` = ifelse(str_starts(`Credit Name`, 'Alcoholic'), 'Alcoholic Beverage Production Credit', `Credit Name`), `Credit Name` = ifelse(str_starts(`Credit Name`, 'Manufacture'), 'Real Property Tax Relief Credit for Manufacturing', `Credit Name`)) %>% select(`Credit Name`) %>% distinct() %>% arrange(`Credit Name`) #Next Time
+```
 
 Cleaning the Datasets
 ```{r}
