@@ -17,15 +17,79 @@ NYS_tax_credit_net_income <- read_csv('NYS_Corp_Tax_Credit_data/NYS_tax_credit_n
 NYS_tax_credit_taxation_basis <- read_csv('NYS_Corp_Tax_Credit_data/NYS_tax_credit_taxation_basis.csv')
 NYS_tax_credit_industry <- read_csv('NYS_Corp_Tax_Credit_data/NYS_tax_credit_industry.csv')
 ```
+***SHINY PREP SECTION***
+
 Cleaning up Credit
 ```{r}
-NYS_tax_credit_industry %>% select(`Credit Name`) %>% distinct() %>% arrange(`Credit Name`)
-NYS_tax_credit_net_income %>% select(`Credit Name`) %>% distinct() %>% arrange(`Credit Name`)
 
-NYS_tax_credit_net_income %>% mutate(`Credit Name` = ifelse(str_starts(`Credit Name`, 'Alcoholic'), 'Alcoholic Beverage Production Credit', `Credit Name`), `Credit Name` = ifelse(str_starts(`Credit Name`, 'Manufacture'), 'Real Property Tax Relief Credit for Manufacturing', `Credit Name`)) %>% select(`Credit Name`) %>% distinct() %>% arrange(`Credit Name`) #Next Time
+credit_name_func <- function(df){
+  return (df %>% 
+            mutate(`Credit Name` = ifelse(str_starts(`Credit Name`, 'Alcoholic'), 'Alcoholic Beverage Production Credit', `Credit Name`), 
+                   `Credit Name` = ifelse(str_starts(`Credit Name`, 'Manufacture'), 'Real Property Tax Relief Credit for Manufacturing', `Credit Name`))
+          )
+}
+
+NYS_tax_credit_net_income <- credit_name_func(NYS_tax_credit_net_income) 
+NYS_tax_credit_industry <- credit_name_func(NYS_tax_credit_industry)
+
+# Checks
+# NYS_tax_credit_industry %>% select(`Credit Name`) %>% distinct() %>% arrange(`Credit Name`)
+# NYS_tax_credit_net_income %>% select(`Credit Name`) %>% distinct() %>% arrange(`Credit Name`)
+
 ```
 
-Cleaning the Datasets
+```{r}
+NYS_tax_credit_net_income %>% group_by(`ENI Group`) %>% summarise(Max = max(`Mean Amount of Credit`, na.rm = T), Min = min(`Mean Amount of Credit`, na.rm = T), Mean = mean(`Mean Amount of Credit`, na.rm = T)) %>% arrange(desc(Mean))
+```
+
+```{r}
+head(NYS_tax_credit_net_income)
+NYS_tax_credit_net_income %>% filter(`Number of Taxpayers` > 0) %>% mutate(`Number of Taxpayers` = log(`Number of Taxpayers` + 1)) %>% select(`Tax Year`, `Number of Taxpayers`, `Amount of Credit`, `Mean Amount of Credit`) %>% chart.Correlation(histogram = T)
+```
+
+```{r}
+dim(NYS_tax_credit_net_income)
+missing_values <- NYS_tax_credit_net_income %>% filter(is.na(`Number of Taxpayers`) | `Number of Taxpayers` == 0) #13775 records contain NAs or 0s
+NYS_tax_credit_net_income %>% filter(is.na(`Number of Taxpayers`) | `Number of Taxpayers` == 0, str_detect(Notes, 'd')) #2772 NAs or 0s are based on privacy (Notes contain /d)
+
+as.data.frame(table(missing_values$`ENI Group`, missing_values$`Credit Type`)) %>% pivot_wider(values_from = Freq, names_from = Var2) %>% arrange(desc(`Credit Carried Forward`))
+as.data.frame(table(missing_values$`ENI Group`, missing_values$`Credit Name`)) %>% pivot_wider(values_from = Freq, names_from = Var2)
+```
+
+```{r}
+NYS_tax_credit_net_income %>% mutate(log_taxpayers = log(`Number of Taxpayers` + 1)) %>% filter(log_taxpayers > 0) %>% ggplot(aes(`log_taxpayers`)) + geom_histogram() + facet_wrap(~ `ENI Group`)
+
+NYS_tax_credit_net_income %>% mutate(log_taxpayers = log(`Number of Taxpayers` + 1)) %>% filter(log_taxpayers > 0) %>% ggplot(aes(`log_taxpayers`)) + geom_histogram() + facet_wrap(~ `Tax Year`) #Number of taxpayers increases dramatically after 2011
+```
+
+```{r}
+NYS_tax_credit_net_income %>% mutate(log_taxpayers = log(`Number of Taxpayers` + 1)) %>% filter(log_taxpayers > 0) %>% ggplot(aes(`log_taxpayers`)) + geom_histogram() + facet_wrap(~ `Credit Name`)
+```
+
+```{r}
+NYS_tax_credit_net_income %>% filter(`Mean Amount of Credit` > 0) %>% mutate(log_mean_amount = log(`Mean Amount of Credit`)) %>% ggplot(aes(log_mean_amount)) + geom_histogram() + facet_wrap(~ `Credit Name`)
+```
+
+```{r}
+NYS_tax_credit_net_income %>% filter(`Mean Amount of Credit` > 0) %>% mutate(log_mean_amount = log(`Mean Amount of Credit`)) %>% ggplot(aes(log_mean_amount)) + geom_histogram() + facet_wrap(~ `Tax Year`)
+```
+
+```{r}
+NYS_tax_credit_net_income
+NYS_tax_credit_net_income %>% filter(is.na(`Number of Taxpayers`))
+NYS_tax_credit_net_income %>% select(`Tax Year`, `Credit Type`, `Credit Name`, `ENI Group`, `Number of Taxpayers`, `Mean Amount of Credit`) %>% filter(`Tax Year` == 2019, `Credit Name` == 'Investment Tax Credit', `Credit Type` == 'Credit Earned')
+
+NYS_tax_credit_net_income %>% select(`Tax Year`, `Credit Type`, `Credit Name`, `ENI Group`, `Number of Taxpayers`, `Amount of Credit`) %>% filter(`Tax Year` == 2019, `Credit Name` == 'Alcoholic Beverage Production Credit', `Credit Type` == 'Credit Earned')
+```
+
+
+***SHINY PREP END***
+
+
+
+
+
+Beginning Imputation of Amount of Credit and Number of Taxpayers for Missing Data
 ```{r}
 colnames(NYS_tax_credit_net_income)[5] <- 'Group'
 
@@ -69,6 +133,7 @@ net_income_earned
 #Industry Group Dataset
 industry_earned <- NYS_tax_credit_industry %>% filter_group_func()
 industry_earned
+
 ```
 
 Joining datasets, Filtering and Imputing missing values
@@ -105,9 +170,13 @@ join_total_func <- function(df_e, df_t) {
 
 #Net Income Group Dataset cleaned
 income_cleaned <- join_total_func(net_income_earned, net_income_earned_total)
+income_cleaned
 
 #Industry Group Dataset cleaned
 industry_cleaned <- join_total_func(industry_earned, industry_earned_total)
+industry_cleaned
+
+income_cleaned %>% filter(Year == 2019, Name == 'Alcoholic Beverage Production Credit')
 ```
 
 Writing the final cleaned dataset to a csv file for ensuing regression analysis

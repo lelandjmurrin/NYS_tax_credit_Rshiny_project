@@ -29,6 +29,7 @@ sat.model.summary <- function (df, field, sat.formula){
     print(shapiro.test(df[[field]]))
     
     #Kurtosis evaluation (normal distribution has a value close to 3)
+    print('kurtosis')
     print(kurtosis(df[[field]]))
     linear.model.cleaned = lm(sat.formula, data = df)
     print(summary(linear.model.cleaned))
@@ -58,25 +59,6 @@ sat.model.summary(industry_cleaned, sat.field, sat.formula)
 industry.model <- lm(sat.formula, data = industry_cleaned)
 ```
 
-```{r}
-# linear.model.cleaned2 <- lm(Avg ~ . - Amount, data = income_cleaned)
-# s = summary(linear.model.cleaned)
-# show(s)
-# plot(linear.model.cleaned)
-# 
-# #histograms of response variable to check distribution
-# hist(income_cleaned$Avg)
-# hist(income_cleaned_bc$Avg.bc)
-# 
-# #Shapiro-Wilks test to evaluate normality
-# shapiro.test(income_cleaned$Avg)
-# shapiro.test(income_cleaned_bc$Avg.bc)
-# 
-# #Kurtosis evaluation (normal distribution has a value close to 3)
-# moments::kurtosis(income_cleaned$Avg)
-# moments::kurtosis(income_cleaned_bc$Avg.bc) #evaluated to 2.75 which means very close to 3 so it is normally distributed with possibly slightly less outliers. 
-```
-
 Correcting violation of Normality in previous model with BoxCox transform
 ```{r}
 bc_func <- function (lm.cleaned, lambda.range){
@@ -87,6 +69,7 @@ bc_func <- function (lm.cleaned, lambda.range){
   
 #Income Group Dataset
 income.lambda.bc = bc_func(income.model, seq(-0.2, 0.2, 1/10))
+income.lambda.bc
 
 #Industry Group Dataset
 industry.lambda.bc = bc_func(industry.model, seq(-0.2, 0.2, 1/10))
@@ -97,9 +80,6 @@ bc_transform <- function(df, lambda.bc){
             mutate(Avg.bc = (Avg^lambda.bc -1)/lambda.bc) %>% 
             select(-c(Avg, Amount)))
 }
-
-sat.formula <- Avg.bc ~ .
-sat.field <- 'Avg.bc'
 
 #Income Group Dataset
 income_cleaned_bc <- bc_transform(income_cleaned, income.lambda.bc)
@@ -112,15 +92,17 @@ industry.model.bc = lm(Avg.bc ~ ., data = industry_cleaned_bc)
 
 Checking linear regression assumptions for the transformed data.
 ```{r}
+sat.formula.bc <- Avg.bc ~ .
+sat.field.bc <- 'Avg.bc'
+
 #Income
-sat.model.summary(income_cleaned_bc, sat.field, sat.formula)
+sat.model.summary(income_cleaned_bc, sat.field.bc, sat.formula.bc)
 
 #Industry
-sat.model.summary(industry_cleaned_bc, sat.field, sat.formula)
-
+sat.model.summary(industry_cleaned_bc, sat.field.bc, sat.formula.bc)
 ```
 
-Visualization and model stats
+BIC comparison before and after BoxCox transform
 ```{r}
 BIC(income.model.bc, income.model)
 BIC(industry.model.bc, industry.model)
@@ -132,7 +114,7 @@ Stepwise Regression on Income_cat_bc (boxcox transformed dataset)
 dummy_func <- function (df){
   x = model.matrix(Avg.bc ~., df)[, -1]
   dummy_bc = as.data.frame(x) %>% mutate(Avg.bc = df$Avg.bc)
-  colnames(dummy_bc) <- str_replace_all(colnames(dummy_bc), "-|'|/| |,|�" , '_')
+  colnames(dummy_bc) <- str_replace_all(colnames(dummy_bc), "-|'|/| |,|�|&" , '_')
   return(dummy_bc)
 }
 ```
@@ -141,23 +123,21 @@ Cleaning column names further so stepwise regression doesn't present any errors
 ```{r}
 #Income Group Dataset
 income.dummy.bc <- dummy_func(income_cleaned_bc)
-colnames(income.dummy.bc)[37] <- 'NameManufactureru0092s_Real_Property_Tax_Credit'
+#colnames(income.dummy.bc)[37] <- 'NameManufactureru0092s_Real_Property_Tax_Credit'
 colnames(income.dummy.bc)
 
 #Industry Group Dataset
 industry.dummy.bc <- dummy_func(industry_cleaned_bc)
-colnames(industry.dummy.bc)[35] <- 'NameManufactureru0092s_Real_Property_Tax_Credit'
+#colnames(industry.dummy.bc)[35] <- 'NameManufactureru0092s_Real_Property_Tax_Credit'
 colnames(industry.dummy.bc)
 ```
 
 Stepwise regression using BIC as the criteria (the penalty k = log(n)).
 ```{r}
-#creating models
+#Creating Stepwise Models
 bcs = list(income = income.dummy.bc, industry = industry.dummy.bc)
-bcs[['industry']]
 k = c('income', 'industry')
 forwardBIC = list(income = NULL, industry = NULL)
-forwardBIC[['income']]
 backwardBIC = list(income = NULL, industry = NULL)
 
 for (i in k){
@@ -165,10 +145,24 @@ for (i in k){
   model.empty = lm(Avg.bc ~ 1, data = bc) #intercept only
   model.full = lm(Avg.bc ~ ., data = bc) #All variables
   scope = list(lower = formula(model.empty), upper = formula(model.full))
-  n_obs = bc %>% count() %>% first()
+  n_obs = as.integer(bc %>% count())
   forwardBIC[[i]] = step(model.empty, scope, direction = "forward", k = log(n_obs))
   backwardBIC[[i]] = step(model.full, scope, direction = "backward", k = log(n_obs))
 }
+
+#dplyr::first() should use dplyr not xts
+first
+```
+
+```{r}
+i = 'income'
+ bc = bcs[[i]]
+  model.empty = lm(Avg.bc ~ 1, data = bc) #intercept only
+  model.full = lm(Avg.bc ~ ., data = bc) #All variables
+  scope = list(lower = formula(model.empty), upper = formula(model.full))
+  n_obs = as.integer(bc %>% count())
+  forwardBIC[[i]] = step(model.empty, scope, direction = "forward", k = log(n_obs))
+  backwardBIC[[i]] = step(model.full, scope, direction = "backward", k = log(n_obs))
 ```
 
 Selecting Best Formula per Dataset from Stepwise Regressions
@@ -178,10 +172,23 @@ bic_func <- function (BIC.model){
   print(BIC.coeff %>% arrange(rownames(BIC.coeff)))
   print(summary(BIC.model))
   print(vif(BIC.model))
+  anova()
 }
+
+
+dim(summary(backwardBIC[['income']])$coefficients)[1]
+s = summary(backwardBIC[['income']])
+s$adj.r.squared
 
 bic_func(backwardBIC[['industry']])
 bic_func(forwardBIC[['industry']])
+bic_func(backwardBIC[['income']])
+bic_func(forwardBIC[['income']])
+```
+
+
+```{r}
+#anova(model2, model.saturated)
 
 #Income Group Dataset
 income.best.formula <- backwardBIC[['income']]$call[[2]]

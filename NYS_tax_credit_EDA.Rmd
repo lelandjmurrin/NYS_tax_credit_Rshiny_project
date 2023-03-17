@@ -89,42 +89,6 @@ NYS_tax_credit_net_income %>% filter(`Credit Type` %in% c('Credit Earned', 'Cred
 
 
 
-
-
-
-**Sandbox** Logistic regression for ENI dataset
-```{r}
-# income_cleaned %>% select(Name) %>% distinct()
-# for (i in income_cleaned['Name']) {
-#   income_cleaned %>% mutate(str_sub(income_cleaned[['Name']], 1, 7) = ifelse(Name == str_sub(income_cleaned[['Name']], 1, str_length(income_cleaned[['Name']]))))
-# }
-# 
-# 
-# income_cleaned %>% mutate(str_sub(income_cleaned[['Name']], 1, 7) = ifelse(Name == str_sub(income_cleaned[['Name']], 1, str_length(income_cleaned[['Name']]))))
-# ?mutate()
-# str_replace()
-# 
-# str_sub(income_cleaned[['Name']], 1, str_length(income_cleaned[['Name']]))
-# 
-# str_length(income_cleaned[['Name']])
-# 
-# str_sub(income_cleaned[['Name']], 1, 7)
-# ?str_sub()
-# 
-# income_cleaned %>% mutate(Alcohol = ifelse(Name == 'Alcoholic Beverage Production Credit', 1, 0), 
-#                           Alt_Fuels_Elec = ifelse(Name == 'Alternative Fuels and Electric Vehicle Recharging Property Credit', 1, 0), 
-#                           Alt_Fuels = ifelse(Name == 'Alternative Fuels Credit', 1, 0),
-#                           Alt_Min = ifelse(Name == 'Alternative Minimum Tax Credit', 1, 0))
-#   
-#   
-# logit.overall = glm(Avg ~ . -Amount, family = 'binomial', data = income_cleaned)
-# summary(logit.overall)
-```
-
-
-
-
-
 Industry dataset analysis
 ```{r}
 dim(NYS_tax_credit_industry)
@@ -148,49 +112,4 @@ NYS_tax_credit_industry %>% filter(is.na(`Number of Taxpayers`)) #4003 records w
 
 
 
-
-
-
-
-
-
-***SHINY PREP SECTION***
-
-
-```{r}
-NYS_tax_credit_net_income %>% group_by(`ENI Group`) %>% summarise(Max = max(`Mean Amount of Credit`, na.rm = T), Min = min(`Mean Amount of Credit`, na.rm = T), Mean = mean(`Mean Amount of Credit`, na.rm = T)) %>% arrange(desc(Mean))
-```
-```{r}
-head(NYS_tax_credit_net_income)
-NYS_tax_credit_net_income %>% filter(`Number of Taxpayers` > 0) %>% mutate(`Number of Taxpayers` = log(`Number of Taxpayers` + 1)) %>% select(`Tax Year`, `Number of Taxpayers`, `Amount of Credit`, `Mean Amount of Credit`) %>% chart.Correlation(histogram = T)
-```
-
-```{r}
-dim(NYS_tax_credit_net_income)
-missing_values <- NYS_tax_credit_net_income %>% filter(is.na(`Number of Taxpayers`) | `Number of Taxpayers` == 0) #13775 records contain NAs or 0s
-NYS_tax_credit_net_income %>% filter(is.na(`Number of Taxpayers`) | `Number of Taxpayers` == 0, str_detect(Notes, 'd')) #2772 NAs or 0s are based on privacy (Notes contain /d)
-
-as.data.frame(table(missing_values$`ENI Group`, missing_values$`Credit Type`)) %>% pivot_wider(values_from = Freq, names_from = Var2) %>% arrange(desc(`Credit Carried Forward`))
-as.data.frame(table(missing_values$`ENI Group`, missing_values$`Credit Name`)) %>% pivot_wider(values_from = Freq, names_from = Var2)
-```
-```{r}
-NYS_tax_credit_net_income %>% mutate(log_taxpayers = log(`Number of Taxpayers` + 1)) %>% filter(log_taxpayers > 0) %>% ggplot(aes(`log_taxpayers`)) + geom_histogram() + facet_wrap(~ `ENI Group`)
-
-NYS_tax_credit_net_income %>% mutate(log_taxpayers = log(`Number of Taxpayers` + 1)) %>% filter(log_taxpayers > 0) %>% ggplot(aes(`log_taxpayers`)) + geom_histogram() + facet_wrap(~ `Tax Year`) #Number of taxpayers increases dramatically after 2011
-```
-```{r}
-NYS_tax_credit_net_income %>% mutate(log_taxpayers = log(`Number of Taxpayers` + 1)) %>% filter(log_taxpayers > 0) %>% ggplot(aes(`log_taxpayers`)) + geom_histogram() + facet_wrap(~ `Credit Name`)
-```
-```{r}
-NYS_tax_credit_net_income %>% filter(`Mean Amount of Credit` > 0) %>% mutate(log_mean_amount = log(`Mean Amount of Credit`)) %>% ggplot(aes(log_mean_amount)) + geom_histogram() + facet_wrap(~ `Credit Name`)
-```
-```{r}
-NYS_tax_credit_net_income %>% filter(`Mean Amount of Credit` > 0) %>% mutate(log_mean_amount = log(`Mean Amount of Credit`)) %>% ggplot(aes(log_mean_amount)) + geom_histogram() + facet_wrap(~ `Tax Year`)
-```
-```{r}
-NYS_tax_credit_net_income %>% filter(is.na(`Number of Taxpayers`))
-NYS_tax_credit_net_income %>% select(`Tax Year`, `Credit Type`, `Credit Name`, `ENI Group`, `Number of Taxpayers`, `Mean Amount of Credit`) %>% filter(`Tax Year` == 2019, `Credit Name` == 'Investment Tax Credit', `Credit Type` == 'Credit Earned')
-
-NYS_tax_credit_net_income %>% select(`Tax Year`, `Credit Type`, `Credit Name`, `ENI Group`, `Number of Taxpayers`, `Mean Amount of Credit`) %>% filter(`Tax Year` == 2019, ' `Credit Type` == 'Credit Earned')
-```
 
