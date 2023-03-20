@@ -117,6 +117,8 @@ dummy_func <- function (df){
   colnames(dummy_bc) <- str_replace_all(colnames(dummy_bc), "-|'|/| |,|�|&" , '_')
   return(dummy_bc)
 }
+
+#add in str_replace_all -> [`()]
 ```
 
 Cleaning column names further so stepwise regression doesn't present any errors
@@ -132,7 +134,7 @@ industry.dummy.bc <- dummy_func(industry_cleaned_bc)
 colnames(industry.dummy.bc)
 ```
 
-Stepwise regression using BIC as the criteria (the penalty k = log(n)).
+Stepwise regression using BIC as the criteria (k = log(n)).
 ```{r}
 #Creating Stepwise Models
 bcs = list(income = income.dummy.bc, industry = industry.dummy.bc)
@@ -153,44 +155,42 @@ for (i in k){
 
 Selecting Best Formula per Dataset from Stepwise Regressions
 ```{r}
-bic_func <- function (BIC.model, sat.model){
+bic_func <- function (BIC.model){
   print('Adjusted R Squared:')
   print(summary(BIC.model)$adj.r.squared)
   print('Number of Coefficients:')
   print(dim(summary(BIC.model)$coefficient)[1])
   print('VIF Check: ')
   print(max(vif(BIC.model)))
-  print('Anova test p-value (between saturated model and stepwise):')
-  print(anova(BIC.model, sat.model)$`Pr(>F)`[2])
   print("*************************")
 }
 
-a = anova(forwardBIC[['income']], model.fulls[['income']])
-
-a$`Pr(>F)`[2]
-
-bic_func(forwardBIC[['income']], model.fulls[['income']])
-bic_func(backwardBIC[['income']], model.fulls[['income']])
-bic_func(forwardBIC[['industry']], model.fulls[['industry']])
-bic_func(backwardBIC[['industry']], model.fulls[['industry']])
-
-bic_func(model.fulls[['industry']], model.fulls[['industry']])
+bic_func(forwardBIC[['income']])
+bic_func(backwardBIC[['income']])
+bic_func(forwardBIC[['industry']]) 
+bic_func(backwardBIC[['industry']])
 
 
-VIF.variables <- as.data.frame(vif(model.fulls[['industry']])) %>% 
-  select(VIF = `vif(model.fulls[["industry"]])`) %>% 
-  filter(VIF > 5) %>% rownames()
 
-industry.dummy.bc %>% select(-all_of(VIF.variables))
+#Manual reduction of variables using VIF and then checked versus saturated model with Anova. This was not used because the saturated model contained multicollinearity issues as indicated by a high VIF score on some coefficients. And the anova test suggested that the coefficients removed in the reduced model were informative in our model, so we couldn't use it either. Thus Stepwise reduction is the preferred method for best model fit.
+
+# VIF.variables <- as.data.frame(vif(model.fulls[['industry']])) %>% 
+#   select(VIF = `vif(model.fulls[["industry"]])`) %>% 
+#   filter(VIF > 5) %>% rownames()
+# 
+# industry.dummy.bc.VIF <- industry.dummy.bc %>% select(-all_of(VIF.variables))
+# industry.model.VIF <- lm(Avg.bc ~ ., data = industry.dummy.bc.VIF)
+# summary(industry.model.VIF)
+# anova(industry.model.VIF, model.fulls[['industry']])
 
 ```
 
-
+Best Model Selection from Stepwise
 ```{r}
-#anova(model2, model.saturated)
+#The Best Models selected for both income and industry were forwardBIC.
 
 #Income Group Dataset
-income.best.formula <- backwardBIC[['income']]$call[[2]]
+income.best.formula <- forwardBIC[['income']]$call[[2]]
 income.best.formula
 
 #Industry Group Dataset
@@ -198,49 +198,15 @@ industry.best.formula <- forwardBIC[['industry']]$call[[2]]
 industry.best.formula
 ```
 
-Stepwise regression using BIC as the criteria (the penalty k = log(n)).
-```{r}
-# #Forward BIC stepwise
-# forwardBIC = step(model.empty, scope, direction = "forward", k = log(n_obs))
-# fwd.BIC.summary.ENI <- data.frame(summary(forwardBIC)$coefficients)
-# fwd.BIC.summary.ENI %>% arrange(rownames(fwd.BIC.summary.ENI))
-# 
-# #Backward BIC stepwise
-# backwardBIC = step(model.full, scope, direction = "backward", k = log(n_obs))
-# bwd.BIC.summary.ENI <- data.frame(summary(backwardBIC)$coefficients)
-# bwd.BIC.summary.ENI %>% arrange(rownames(bwd.BIC.summary.ENI))
-# 
-# summary(forwardBIC)
-# summary(backwardBIC)
-# 
-# #inputing forwardBIC into a dataframe with index created as a column
-# fwd.BIC.summary.ENI$ENI = rownames(fwd.BIC.summary.ENI)
-# rownames(fwd.BIC.summary.ENI) = NULL
-# fwd.BIC.summary.ENI
-# 
-# #inputing backwardBIC into a dataframe with index created as a column
-# bwd.BIC.summary.ENI$ENI = rownames(bwd.BIC.summary.ENI)
-# rownames(bwd.BIC.summary.ENI) = NULL
-# bwd.BIC.summary.ENI
-# 
-# #comparing the forward and backward stepwise regression coefficients
-# anti_join(fwd.BIC.summary.ENI, bwd.BIC.summary.ENI, by = 'ENI')
-# inner_join(fwd.BIC.summary.ENI, bwd.BIC.summary.ENI, by = 'ENI')
-# 
-# #choosing backwardBIC because of negligible reduction in adjusted R^2 but we can reduce our sizable number of predictor variables.
-# 
-# #checking our selected model's predictor variable's VIFs
-# vif(backwardBIC)
-# 
-# best.formula <- backwardBIC$call[[2]]
-```
-
-
 Splitting data up into test data and training data (test data is for year 2019, training is the rest)
 ```{r}
 test_train_split <- function(dummy_bc, best.formula) {
-  data.test <- dummy_bc %>% filter(Year == 2019)
-  data.train <- dummy_bc %>% filter(Year != 2019)
+  # data.test <- dummy_bc %>% filter(Year == 2019)
+  # data.train <- dummy_bc %>% filter(Year != 2019)
+  set.seed(0)
+  train.i = sample(1:nrow(dummy_bc), 0.8*nrow(dummy_bc), replace = F)
+  data.train <- dummy_bc %>% slice(train.i)
+  data.test <- dummy_bc %>% slice(-train.i)
   
   #train
   #X.train <- as.matrix(data.train %>% select(-Avg.bc))
@@ -251,48 +217,36 @@ test_train_split <- function(dummy_bc, best.formula) {
   #X.test <- as.matrix(data.test %>% select(-Avg.bc))
   X.test <- model.matrix(best.formula, data = data.test)[,-1]
   y.test <- as.matrix(data.test %>% select(Avg.bc))
-  return (list('X.train' = X.train, 'y.train' = y.train, 'X.test' = X.test, 'y.test' = y.test))
+  return (list('X.train' = X.train, 'y.train' = y.train, 'X.test' = X.test, 'y.test' = y.test, 'data.train' = data.train, 'data.test' = data.test))
 }
 
-
+#Income
+income.data.split.sat <- test_train_split(income.dummy.bc, Avg.bc ~ .)
 income.data.split <- test_train_split(income.dummy.bc, income.best.formula)
-income.data.split[['y.train']]
 
+#Industry
+industry.data.split.sat <- test_train_split(industry.dummy.bc, Avg.bc ~ .)
 industry.data.split <- test_train_split(industry.dummy.bc, industry.best.formula)
-
-# data.test <- dummy_bc %>% filter(Year == 2019)
-# data.train <- dummy_bc %>% filter(Year != 2019)
-# 
-# #training model based on best.formula from stepwise
-# train.model <- lm(best.formula, data = data.train)
-# summary(train.model)
-# 
-# #train
-# #X.train <- as.matrix(data.train %>% select(-Avg.bc))
-# X.train <- model.matrix(best.formula, data = data.train)[,-1]
-# y.train <- as.matrix(data.train %>% select(Avg.bc))
-# 
-# #test
-# #X.test <- as.matrix(data.test %>% select(-Avg.bc))
-# X.test <- model.matrix(best.formula, data = data.test)[,-1]
-# y.test <- as.matrix(data.test %>% select(Avg.bc))
-# 
-# dim(X.train)
-# dim(X.test)
 ```
 
 
-Lasso regression for comparison to backward stepwise
+Lasso regression for comparison to Forward Stepwise
 ```{r}
-calc_MSE <- function (model, x.test, y.test){
-  y.predict <- predict(model, newdata = x.test)
-  return(mean((y.predict - y.test)^2))
-}
+# calc_MSE <- function (model, x.test, y.test){
+#   y.predict <- predict(model, newdata = x.test)
+#   return(mean((y.predict - y.test)^2))
+# }
 
-xy.sat.splits <- list('income' = income.dummy.bc, 'industry' = industry.dummy.bc)
-xy.splits <- list('income' = income.data.split, 'industry' = industry.data.split)
+xy.splits <- list('income' = income.data.split, 
+                  'industry' = industry.data.split, 
+                  'income.sat' = income.data.split.sat, 
+                  'industry.sat' = industry.data.split.sat)
 
-for (i in k){
+lasso.list <- c('income', 'industry', 'income.sat', 'industry.sat')
+baseline.list <- c('income.sat', 'industry.sat', 'income.sat', 'industry.sat')
+
+for (a in 1:4){
+  i = lasso.list[a]
   X.train <- xy.splits[[i]][['X.train']]
   y.train <- xy.splits[[i]][['y.train']]
   X.test <- xy.splits[[i]][['X.test']]
@@ -323,7 +277,8 @@ for (i in k){
   
   #looking at the lasso coefficients for the best.lambda
   best.lambda.coeff <- predict(lasso.models, s = best.lambda, type = "coefficients")
-  print(best.lambda.coeff)
+  print('Number of Coefficients:')
+  print(dim(best.lambda.coeff)[1])
   
   #fitting a model with the best lambda found to be 0.000689 and using it to make predictions for the testing data.
   lasso.best.lambda.train.pred <- predict(lasso.models, s = best.lambda, newx = X.test)
@@ -331,12 +286,35 @@ for (i in k){
   
   #checking MSE
   MSE.lasso <- mean((lasso.best.lambda.train.pred - y.test)^2)
-  sat.data.split <- test_train_split(xy.sat.splits[[i]], Avg.bc ~ .)
-  sat.model.bc <- lm(Avg.bc ~., data = as.data.frame(cbind(sat.data.split[['X.train']], sat.data.split[['y.train']])))
-  MSE.sat <- calc_MSE(sat.model.bc, as.data.frame(sat.data.split[['X.test']]), sat.data.split[['y.test']])
+  sat.model.bc <- lm(Avg.bc ~., data = xy.splits[[i]][['data.train']])
+  
+  b = baseline.list[a]
+  temp.df <- as.data.frame(xy.splits[[b]][['X.test']]) #temp fix
+  colnames(temp.df) <- str_replace_all(colnames(temp.df), "[`]", '')
+  
+  y.predict <- predict(sat.model.bc, newdata = temp.df)
+  MSE.sat <- mean((y.predict - xy.splits[[b]][['y.test']])^2)
   
   print(paste(i, ' Lasso MSE: ', MSE.lasso, ' Saturated MSE: ', MSE.sat))
+  print('********************************')
 }
+
+# sat.model.bc <- lm(Avg.bc ~., data = xy.splits.sat[['industry']][['data.train']])
+# 
+# temp.df <- as.data.frame(xy.splits.sat[['industry']][['X.test']])
+# 
+# colnames(temp.df)[57]
+# 
+# colnames(temp.df) <- str_replace_all(colnames(temp.df), "[`]", '')
+# colnames(temp.df)
+# 
+# y.predict <- predict(sat.model.bc, newdata = temp.df)
+# MSE.sat <- mean((y.predict - xy.splits.sat[['industry']][['y.test']])^2)
+# 
+# print(paste(i, ' Lasso MSE: ', MSE.lasso, ' Saturated MSE: ', MSE.sat))
+# 
+# summary(sat.model.bc)$coefficients
+# as.data.frame(xy.splits.sat[['industry']][['X.test']]) %>% select(starts_with('`GroupOth'))
 
 ```
 
