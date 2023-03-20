@@ -136,54 +136,53 @@ Stepwise regression using BIC as the criteria (the penalty k = log(n)).
 ```{r}
 #Creating Stepwise Models
 bcs = list(income = income.dummy.bc, industry = industry.dummy.bc)
+model.fulls = list(income = lm(Avg.bc ~ ., data = income.dummy.bc), industry = lm(Avg.bc ~ ., data = industry.dummy.bc)) #All variables
+model.emptys = list(income = lm(Avg.bc ~ 1, data = income.dummy.bc), industry = lm(Avg.bc ~ 1, data = industry.dummy.bc)) #intercept only
 k = c('income', 'industry')
 forwardBIC = list(income = NULL, industry = NULL)
 backwardBIC = list(income = NULL, industry = NULL)
 
 for (i in k){
   bc = bcs[[i]]
-  model.empty = lm(Avg.bc ~ 1, data = bc) #intercept only
-  model.full = lm(Avg.bc ~ ., data = bc) #All variables
-  scope = list(lower = formula(model.empty), upper = formula(model.full))
-  n_obs = as.integer(bc %>% count())
-  forwardBIC[[i]] = step(model.empty, scope, direction = "forward", k = log(n_obs))
-  backwardBIC[[i]] = step(model.full, scope, direction = "backward", k = log(n_obs))
+  scope = list(lower = formula(model.emptys[[i]]), upper = formula(model.fulls[[i]]))
+  n_obs = bc %>% count() %>% dplyr::first()
+  forwardBIC[[i]] = step(model.emptys[[i]], scope, direction = "forward", k = log(n_obs))
+  backwardBIC[[i]] = step(model.fulls[[i]], scope, direction = "backward", k = log(n_obs))
 }
-
-#dplyr::first() should use dplyr not xts
-first
-```
-
-```{r}
-i = 'income'
- bc = bcs[[i]]
-  model.empty = lm(Avg.bc ~ 1, data = bc) #intercept only
-  model.full = lm(Avg.bc ~ ., data = bc) #All variables
-  scope = list(lower = formula(model.empty), upper = formula(model.full))
-  n_obs = as.integer(bc %>% count())
-  forwardBIC[[i]] = step(model.empty, scope, direction = "forward", k = log(n_obs))
-  backwardBIC[[i]] = step(model.full, scope, direction = "backward", k = log(n_obs))
 ```
 
 Selecting Best Formula per Dataset from Stepwise Regressions
 ```{r}
-bic_func <- function (BIC.model){
-  BIC.coeff <- data.frame(summary(BIC.model)$coefficients) 
-  print(BIC.coeff %>% arrange(rownames(BIC.coeff)))
-  print(summary(BIC.model))
-  print(vif(BIC.model))
-  anova()
+bic_func <- function (BIC.model, sat.model){
+  print('Adjusted R Squared:')
+  print(summary(BIC.model)$adj.r.squared)
+  print('Number of Coefficients:')
+  print(dim(summary(BIC.model)$coefficient)[1])
+  print('VIF Check: ')
+  print(max(vif(BIC.model)))
+  print('Anova test p-value (between saturated model and stepwise):')
+  print(anova(BIC.model, sat.model)$`Pr(>F)`[2])
+  print("*************************")
 }
 
+a = anova(forwardBIC[['income']], model.fulls[['income']])
 
-dim(summary(backwardBIC[['income']])$coefficients)[1]
-s = summary(backwardBIC[['income']])
-s$adj.r.squared
+a$`Pr(>F)`[2]
 
-bic_func(backwardBIC[['industry']])
-bic_func(forwardBIC[['industry']])
-bic_func(backwardBIC[['income']])
-bic_func(forwardBIC[['income']])
+bic_func(forwardBIC[['income']], model.fulls[['income']])
+bic_func(backwardBIC[['income']], model.fulls[['income']])
+bic_func(forwardBIC[['industry']], model.fulls[['industry']])
+bic_func(backwardBIC[['industry']], model.fulls[['industry']])
+
+bic_func(model.fulls[['industry']], model.fulls[['industry']])
+
+
+VIF.variables <- as.data.frame(vif(model.fulls[['industry']])) %>% 
+  select(VIF = `vif(model.fulls[["industry"]])`) %>% 
+  filter(VIF > 5) %>% rownames()
+
+industry.dummy.bc %>% select(-all_of(VIF.variables))
+
 ```
 
 
