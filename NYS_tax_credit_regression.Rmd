@@ -114,11 +114,10 @@ Stepwise Regression on Income_cat_bc (boxcox transformed dataset)
 dummy_func <- function (df){
   x = model.matrix(Avg.bc ~., df)[, -1]
   dummy_bc = as.data.frame(x) %>% mutate(Avg.bc = df$Avg.bc)
-  colnames(dummy_bc) <- str_replace_all(colnames(dummy_bc), "-|'|/| |,|�|&" , '_')
+  #colnames(dummy_bc) <- str_replace_all(colnames(dummy_bc), "-|'|/| |,|�|&" , '_')
+  colnames(dummy_bc) <- str_replace_all(colnames(dummy_bc), "[-'/ ,�&()`]" , '_')
   return(dummy_bc)
 }
-
-#add in str_replace_all -> [`()]
 ```
 
 Cleaning column names further so stepwise regression doesn't present any errors
@@ -244,26 +243,32 @@ xy.splits <- list('income' = income.data.split,
 
 lasso.list <- c('income', 'industry', 'income.sat', 'industry.sat')
 baseline.list <- c('income.sat', 'industry.sat', 'income.sat', 'industry.sat')
+ridge.alpha <- 0
 
 for (a in 1:4){
   i = lasso.list[a]
+  b = baseline.list[a]
   X.train <- xy.splits[[i]][['X.train']]
   y.train <- xy.splits[[i]][['y.train']]
   X.test <- xy.splits[[i]][['X.test']]
   y.test <- xy.splits[[i]][['y.test']]
+  X.test.sat <- xy.splits[[b]][['X.test']]
+  y.test.sat <- xy.splits[[b]][['y.test']]
+  data.train <- xy.splits[[i]][['data.train']]
+  data.test <- xy.splits[[i]][['data.test']]
   
   #create lambda grid
   lambda.grid = 10^seq(2, -5, length = 100)
   
   #create lasso models with lambda.grid
-  lasso.models = glmnet(X.train, y.train, alpha = 1, lambda = lambda.grid)
+  lasso.models = glmnet(X.train, y.train, alpha = ridge.alpha, lambda = lambda.grid)
   
   #visualize coefficient shrinkage
   plot(lasso.models, xvar = "lambda", label = TRUE, main = paste("Lasso Regression:", i))
   
   #Cross Validation to find best lambda
   set.seed(0)
-  cv.lasso.models <- cv.glmnet(X.train, y.train, alpha = 1, lambda = lambda.grid, nfolds = 10)
+  cv.lasso.models <- cv.glmnet(X.train, y.train, alpha = ridge.alpha, lambda = lambda.grid, nfolds = 10)
   
   #visualize cross validation for lambda that minimizes the mean squared error.
   plot(cv.lasso.models, main = paste("Lasso Regression:", i))
@@ -286,19 +291,41 @@ for (a in 1:4){
   
   #checking MSE
   MSE.lasso <- mean((lasso.best.lambda.train.pred - y.test)^2)
-  sat.model.bc <- lm(Avg.bc ~., data = xy.splits[[i]][['data.train']])
+  sat.model.bc <- lm(Avg.bc ~., data = data.train)
   
-  b = baseline.list[a]
-  temp.df <- as.data.frame(xy.splits[[b]][['X.test']]) #temp fix
+  
+  temp.df <- as.data.frame(X.test.sat) #temp fix
   colnames(temp.df) <- str_replace_all(colnames(temp.df), "[`]", '')
   
   y.predict <- predict(sat.model.bc, newdata = temp.df)
-  MSE.sat <- mean((y.predict - xy.splits[[b]][['y.test']])^2)
+  MSE.sat <- mean((y.predict - y.test.sat)^2)
   
-  print(paste(i, ' Lasso MSE: ', MSE.lasso, ' Saturated MSE: ', MSE.sat))
+  print(paste(i, ' Lasso MSE: ', MSE.lasso, ' ', b, ' Saturated MSE: ', MSE.sat))
+
+  metrics <- eval_results(y.test, lasso.best.lambda.train.pred, data.test)
+  print(metrics)
   print('********************************')
 }
+```
 
+
+```{r}
+all.dfs <- list(income_cleaned, income_cleaned_bc, income.dummy.bc)
+all.splits <- list(
+  income_cleaned = test_train_split(income_cleaned, Avg ~ .),
+  income_cleaned_bc = test_train_split(income_cleaned_bc, Avg.bc ~ .),
+  income.data.split.sat = test_train_split(income.dummy.bc, Avg.bc ~ .),
+  income.data.split = test_train_split(income.dummy.bc, income.best.formula)
+)
+
+for (i in all.splits) {
+  print(i)
+}
+
+```
+
+
+```{r}
 # sat.model.bc <- lm(Avg.bc ~., data = xy.splits.sat[['industry']][['data.train']])
 # 
 # temp.df <- as.data.frame(xy.splits.sat[['industry']][['X.test']])
@@ -317,6 +344,42 @@ for (a in 1:4){
 # as.data.frame(xy.splits.sat[['industry']][['X.test']]) %>% select(starts_with('`GroupOth'))
 
 ```
+
+
+```{r}
+0.7293
+
+# Compute R^2 from true and predicted values
+eval_results <- function(true, predicted, df) {
+  SSE <- sum((predicted - true)^2)
+  SST <- sum((true - mean(true))^2)
+  R_square <- 1 - SSE / SST
+  RMSE = sqrt(SSE/nrow(df))
+
+  
+  # Model performance metrics
+  return(c(RMSE = RMSE,
+  Rsquare = R_square))
+  
+}
+
+# Prediction and evaluation on train data
+predictions_train <- predict(ridge_reg, s = optimal_lambda, newx = x)
+eval_results(y_train, predictions_train, train)
+
+# Prediction and evaluation on test data
+predictions_test <- predict(ridge_reg, s = optimal_lambda, newx = x_test)
+eval_results(y_test, predictions_test, test)
+
+summary(income.model.bc)
+income.dummy.bc
+```
+
+
+
+
+
+
 
 ```{r}
 as.data.frame(lasso.best.lambda.train.pred) %>% mutate(Avg_in_dollars = (lasso.best.lambda.train.pred*lambda.bc+1)^(1/lambda.bc))
