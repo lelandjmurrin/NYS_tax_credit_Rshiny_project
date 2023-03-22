@@ -54,6 +54,7 @@ sat.field <- 'Avg'
 
 sat.model.summary(income_cleaned, sat.field, sat.formula)
 income.model <- lm(sat.formula, data = income_cleaned)
+summary(income.model)
 
 sat.model.summary(industry_cleaned, sat.field, sat.formula)
 industry.model <- lm(sat.formula, data = industry_cleaned)
@@ -197,9 +198,37 @@ industry.best.formula <- forwardBIC[['industry']]$call[[2]]
 industry.best.formula
 ```
 
+
 Splitting data up into test data and training data (test data is for year 2019, training is the rest)
 ```{r}
 test_train_split <- function(dummy_bc, best.formula) {
+  # data.test <- dummy_bc %>% filter(Year == 2019)
+  # data.train <- dummy_bc %>% filter(Year != 2019)
+  X <- model.matrix(best.formula, data = dummy_bc)[,-1]
+  y <- as.matrix(dummy_bc %>% select(all.vars(best.formula)[1]))
+  
+  set.seed(0)
+  train.i = sample(1:nrow(dummy_bc), 0.8*nrow(dummy_bc), replace = F)
+  
+  #train
+  X.train <- X[train.i,]
+  y.train <- y[train.i,]
+  
+  #test
+  X.test <- X[-train.i,]
+  y.test <- y[-train.i,]
+  
+  data.train <- as.data.frame(cbind(y.train, X.train))
+  data.test <- as.data.frame(cbind(y.test, X.test))
+  colnames(data.train)[1] = all.vars(best.formula)[1]
+  colnames(data.test)[1] = all.vars(best.formula)[1]
+  
+  return (list('X.train' = X.train, 'y.train' = y.train, 'X.test' = X.test, 'y.test' = y.test, 'data.train' = data.train, 'data.test' = data.test))
+}
+```
+
+```{r}
+test_train_split_old <- function(dummy_bc, best.formula) {
   # data.test <- dummy_bc %>% filter(Year == 2019)
   # data.train <- dummy_bc %>% filter(Year != 2019)
   set.seed(0)
@@ -210,13 +239,14 @@ test_train_split <- function(dummy_bc, best.formula) {
   #train
   #X.train <- as.matrix(data.train %>% select(-Avg.bc))
   X.train <- model.matrix(best.formula, data = data.train)[,-1]
-  y.train <- as.matrix(data.train %>% select(Avg.bc))
+  y.train <- as.matrix(data.train %>% select(all.vars(best.formula)[1]))
 
   #test
   #X.test <- as.matrix(data.test %>% select(-Avg.bc))
   X.test <- model.matrix(best.formula, data = data.test)[,-1]
-  y.test <- as.matrix(data.test %>% select(Avg.bc))
-  return (list('X.train' = X.train, 'y.train' = y.train, 'X.test' = X.test, 'y.test' = y.test, 'data.train' = data.train, 'data.test' = data.test))
+  y.test <- as.matrix(data.test %>% select(all.vars(best.formula)[1]))
+  
+  #return (list('X.train' = X.train, 'y.train' = y.train, 'X.test' = X.test, 'y.test' = y.test, 'data.train' = data.train, 'data.test' = data.test))
 }
 
 #Income
@@ -226,6 +256,9 @@ income.data.split <- test_train_split(income.dummy.bc, income.best.formula)
 #Industry
 industry.data.split.sat <- test_train_split(industry.dummy.bc, Avg.bc ~ .)
 industry.data.split <- test_train_split(industry.dummy.bc, industry.best.formula)
+
+test_train_split(income_cleaned, Avg ~ .)
+
 ```
 
 
@@ -308,20 +341,100 @@ for (a in 1:4){
 }
 ```
 
-
+Function to show metrics (R^2 and MSE) for Regularization (Ridge/Lasso)
 ```{r}
-all.dfs <- list(income_cleaned, income_cleaned_bc, income.dummy.bc)
-all.splits <- list(
-  income_cleaned = test_train_split(income_cleaned, Avg ~ .),
-  income_cleaned_bc = test_train_split(income_cleaned_bc, Avg.bc ~ .),
-  income.data.split.sat = test_train_split(income.dummy.bc, Avg.bc ~ .),
-  income.data.split = test_train_split(income.dummy.bc, income.best.formula)
-)
-
-for (i in all.splits) {
-  print(i)
+regularization_func <- function (data, alpha, name){
+  X.train <- data[['X.train']]
+  y.train <- data[['y.train']]
+  X.test <- data [['X.test']]
+  y.test <- data[['y.test']]
+  data.test <- data[['data.test']]
+  print(colnames(X.train))
+  print(colnames(X.test))
+  print(setdiff(colnames(X.train), colnames(X.test)))
+  
+  #create lambda grid
+  lambda.grid = 10^seq(10, -10, length = 100)
+  
+  #create lasso models with lambda.grid
+  lasso.models = glmnet(X.train, y.train, alpha = ridge.alpha, lambda = lambda.grid)
+  
+  #visualize coefficient shrinkage
+  # plot(lasso.models, xvar = "lambda", label = TRUE, main = paste("Lasso Regression:", i))
+  
+  #Cross Validation to find best lambda
+  set.seed(0)
+  cv.lasso.models <- cv.glmnet(X.train, y.train, alpha = ridge.alpha, lambda = lambda.grid, nfolds = 10)
+  
+  #visualize cross validation for lambda that minimizes the mean squared error.
+  plot(cv.lasso.models, main = paste("Alpha:", alpha, "Regression:", name))
+  
+  #Checking the best lambda
+  # log(cv.lasso.models$lambda.min)
+  # best.lambda <- cv.lasso.models$lambda.min
+  # print(paste(i, ' best.lambda:', best.lambda))
+  # best lambda with all the variables was found to be 0.0006892612
+  # best lambda with only the bwdBIC coefficients included was found to be 0.0003053856
+  
+  #looking at the lasso coefficients for the best.lambda
+  # best.lambda.coeff <- predict(lasso.models, s = cv.lasso.models$lambda.min, type = "coefficients")
+  # print('Number of Coefficients:')
+  # print(dim(best.lambda.coeff)[1])
+  
+  #fitting a model with the best lambda found to be 0.000689 and using it to make predictions for the testing data.
+  lasso.best.lambda.train.pred <- predict(lasso.models, s = cv.lasso.models$lambda.min, newx = X.test)
+  lasso.best.lambda.train.pred
+  
+  
+  #checking MSE
+  MSE.lasso <- mean((lasso.best.lambda.train.pred - y.test)^2)
+  
+  return(eval_results(y.test, lasso.best.lambda.train.pred, data.test)['Rsquare'])
 }
 
+regularization_func(all.splits[['income_cleaned']], 0, 'income_cleaned')
+regularization_func(all.splits[['income_cleaned_bc']], 0, 'income_cleaned_bc')
+regularization_func(all.splits[['income.data.split.sat']], 0, 'income.data.split.sat')
+```
+
+
+```{r}
+#all.dfs <- list(income_cleaned, income_cleaned_bc, income.dummy.bc)
+
+all.splits <- list(
+  'income_cleaned' = test_train_split(income_cleaned, Avg ~ .),
+  'income_cleaned_bc' = test_train_split(income_cleaned_bc, Avg.bc ~ .),
+  'income.data.split.sat' = test_train_split(income.dummy.bc, Avg.bc ~ .),
+  'income.data.split.best' = test_train_split(income.dummy.bc, income.best.formula)
+)
+#For loops initialization
+formulas <- list(income_cleaned = sat.formula, income_cleaned_bc = sat.formula.bc, income.data.split.sat = sat.formula.bc, income.data.split.best = income.best.formula)
+
+no.reg.r2 <- c() 
+lasso.reg.r2 <- c()
+ridge.reg.r2 <- c()
+
+
+for (i in names(all.splits)) {
+  #no regularization
+  m = lm(formulas[[i]], all.splits[[i]][['data.train']])
+  no.reg.r2 <- c(no.reg.r2, summary(m)$adj.r.squared)
+  
+  #lasso regularization
+  lasso.reg.r2 <- c(lasso.reg.r2, regularization_func(all.splits[[i]], 1, i))
+  
+  #ridge regularization
+  ridge.reg.r2 <- c(ridge.reg.r2, regularization_func(all.splits[[i]], 0, i))
+  
+}
+
+```
+
+
+```{r}
+df.rsquare <- as.data.frame(cbind('noReg' = no.reg.r2, 'lassoReg' = lasso.reg.r2, 'ridgeReg' = ridge.reg.r2))
+rownames(df.rsquare) = names(all.splits)
+df.rsquare
 ```
 
 
@@ -355,9 +468,7 @@ eval_results <- function(true, predicted, df) {
   SST <- sum((true - mean(true))^2)
   R_square <- 1 - SSE / SST
   RMSE = sqrt(SSE/nrow(df))
-
   
-  # Model performance metrics
   return(c(RMSE = RMSE,
   Rsquare = R_square))
   
