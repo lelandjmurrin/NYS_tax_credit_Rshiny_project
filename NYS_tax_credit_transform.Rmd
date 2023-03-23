@@ -164,6 +164,7 @@ join_total_func <- function(df_e, df_t) {
                          Amount = Amount_e) %>%
                   filter(Num != 0) %>%
                   mutate(Avg = Amount/Num) %>% #Calculated the average amount of credit earned per taxpayer (Avg) and being careful not to divide by 0.
+                  select(-Amount) %>% #Fix for issue with Amount column in regression notebook
                   ungroup()
          )
 }

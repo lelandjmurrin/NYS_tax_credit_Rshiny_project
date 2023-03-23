@@ -15,9 +15,10 @@ library(moments)
 Calling the Transformed Datasets
 ```{r}
 income_cleaned = read_csv('NYS_Corp_Tax_Credit_data/income_cleaned.csv')
-income_cleaned
+income_cleaned = income_cleaned %>% select(-Amount)
+
 industry_cleaned = read_csv('NYS_Corp_Tax_Credit_data/industry_cleaned.csv')
-industry_cleaned
+industry_cleaned = industry_cleaned %>% select(-Amount)
 ```
 
 
@@ -49,12 +50,12 @@ sat.model.summary <- function (df, field, sat.formula){
 }
 
 
-sat.formula <- Avg ~ . - Amount
+sat.formula <- Avg ~ .
 sat.field <- 'Avg'
 
 sat.model.summary(income_cleaned, sat.field, sat.formula)
 income.model <- lm(sat.formula, data = income_cleaned)
-summary(income.model)
+
 
 sat.model.summary(industry_cleaned, sat.field, sat.formula)
 industry.model <- lm(sat.formula, data = industry_cleaned)
@@ -79,7 +80,7 @@ industry.lambda.bc
 bc_transform <- function(df, lambda.bc){
   return (df %>% 
             mutate(Avg.bc = (Avg^lambda.bc -1)/lambda.bc) %>% 
-            select(-c(Avg, Amount)))
+            select(-c(Avg))) #took out field Amount
 }
 
 #Income Group Dataset
@@ -257,7 +258,7 @@ income.data.split <- test_train_split(income.dummy.bc, income.best.formula)
 industry.data.split.sat <- test_train_split(industry.dummy.bc, Avg.bc ~ .)
 industry.data.split <- test_train_split(industry.dummy.bc, industry.best.formula)
 
-test_train_split(income_cleaned, Avg ~ .)
+test_train_split(income_cleaned, sat.formula)
 
 ```
 
@@ -349,9 +350,9 @@ regularization_func <- function (data, alpha, name){
   X.test <- data [['X.test']]
   y.test <- data[['y.test']]
   data.test <- data[['data.test']]
-  print(colnames(X.train))
-  print(colnames(X.test))
-  print(setdiff(colnames(X.train), colnames(X.test)))
+  # print(colnames(X.train))
+  # print(colnames(X.test))
+  # print(setdiff(colnames(X.train), colnames(X.test)))
   
   #create lambda grid
   lambda.grid = 10^seq(10, -10, length = 100)
@@ -388,8 +389,10 @@ regularization_func <- function (data, alpha, name){
   
   #checking MSE
   MSE.lasso <- mean((lasso.best.lambda.train.pred - y.test)^2)
-  
-  return(eval_results(y.test, lasso.best.lambda.train.pred, data.test)['Rsquare'])
+  print(paste('Dimensions of the Alpha:', alpha, ' Regression Coefficients for:', name))
+  print(dim(coef(lasso.models))[1])
+  p = dim(coef(lasso.models))[1]
+  return(eval_results(y.test, lasso.best.lambda.train.pred, data.test, p)['Rsquare'])
 }
 
 regularization_func(all.splits[['income_cleaned']], 0, 'income_cleaned')
@@ -401,15 +404,27 @@ regularization_func(all.splits[['income.data.split.sat']], 0, 'income.data.split
 ```{r}
 #all.dfs <- list(income_cleaned, income_cleaned_bc, income.dummy.bc)
 
-all.splits <- list(
-  'income_cleaned' = test_train_split(income_cleaned, Avg ~ .),
-  'income_cleaned_bc' = test_train_split(income_cleaned_bc, Avg.bc ~ .),
-  'income.data.split.sat' = test_train_split(income.dummy.bc, Avg.bc ~ .),
-  'income.data.split.best' = test_train_split(income.dummy.bc, income.best.formula)
-)
-#For loops initialization
-formulas <- list(income_cleaned = sat.formula, income_cleaned_bc = sat.formula.bc, income.data.split.sat = sat.formula.bc, income.data.split.best = income.best.formula)
+formulas <- list(income_cleaned = sat.formula, 
+                 income_cleaned_bc = sat.formula.bc, 
+                 income.data.split.sat = sat.formula.bc, 
+                 income.data.split.best = income.best.formula,
+                 industry_cleaned = sat.formula, 
+                 industry_cleaned_bc = sat.formula.bc, 
+                 industry.data.split.sat = sat.formula.bc, 
+                 industry.data.split.best = industry.best.formula)
 
+all.splits <- list(
+  'income_cleaned' = test_train_split(income_cleaned, formulas[['income_cleaned']]),
+  'income_cleaned_bc' = test_train_split(income_cleaned_bc, formulas[['income_cleaned_bc']]),
+  'income.data.split.sat' = test_train_split(income.dummy.bc, formulas[['income.data.split.sat']]),
+  'income.data.split.best' = test_train_split(income.dummy.bc, formulas[['income.data.split.best']]),
+  'industry_cleaned' = test_train_split(industry_cleaned, formulas[['industry_cleaned']]),
+  'industry_cleaned_bc' = test_train_split(industry_cleaned_bc, formulas[['industry_cleaned_bc']]),
+  'industry.data.split.sat' = test_train_split(industry.dummy.bc, formulas[['industry.data.split.sat']]),
+  'industry.data.split.best' = test_train_split(industry.dummy.bc, formulas[['industry.data.split.best']])
+)
+
+#For loops initialization
 no.reg.r2 <- c() 
 lasso.reg.r2 <- c()
 ridge.reg.r2 <- c()
@@ -418,14 +433,16 @@ ridge.reg.r2 <- c()
 for (i in names(all.splits)) {
   #no regularization
   m = lm(formulas[[i]], all.splits[[i]][['data.train']])
-  no.reg.r2 <- c(no.reg.r2, summary(m)$adj.r.squared)
+  #no.reg.r2 <- c(no.reg.r2, summary(m)$adj.r.squared)
+  y.predict = predict(m, newdata = as.data.frame(all.splits[[i]][['X.test']]))
+  adj.R2 <- eval_results(all.splits[[i]][['y.test']], y.predict, all.splits[[i]][['data.test']], length(coef(m)))['Rsquare']
+  no.reg.r2 <- c(no.reg.r2, adj.R2)
   
   #lasso regularization
   lasso.reg.r2 <- c(lasso.reg.r2, regularization_func(all.splits[[i]], 1, i))
   
   #ridge regularization
   ridge.reg.r2 <- c(ridge.reg.r2, regularization_func(all.splits[[i]], 0, i))
-  
 }
 
 ```
@@ -460,30 +477,19 @@ df.rsquare
 
 
 ```{r}
-0.7293
-
 # Compute R^2 from true and predicted values
-eval_results <- function(true, predicted, df) {
-  SSE <- sum((predicted - true)^2)
-  SST <- sum((true - mean(true))^2)
-  R_square <- 1 - SSE / SST
-  RMSE = sqrt(SSE/nrow(df))
+eval_results <- function(true, predicted, df, p) {
+  n = nrow(df)
+  adj.RSS <- sum((predicted - true)^2)/(n-p-1)
+  adj.TSS <- sum((true - mean(true))^2)/(n-1)
+  adj.R_square <- 1 - adj.RSS / adj.TSS
+  #RMSE = sqrt(RSS/n)
   
-  return(c(RMSE = RMSE,
-  Rsquare = R_square))
-  
+  return(c(Rsquare = adj.R_square))
 }
 
-# Prediction and evaluation on train data
-predictions_train <- predict(ridge_reg, s = optimal_lambda, newx = x)
-eval_results(y_train, predictions_train, train)
-
-# Prediction and evaluation on test data
-predictions_test <- predict(ridge_reg, s = optimal_lambda, newx = x_test)
-eval_results(y_test, predictions_test, test)
-
-summary(income.model.bc)
-income.dummy.bc
+#formula for adjusted R^2 found in following link.
+#https://www.graphpad.com/guides/prism/latest/curve-fitting/reg_adjusted-r-squared.htm
 ```
 
 
