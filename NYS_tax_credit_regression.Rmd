@@ -8,7 +8,9 @@ library(tidyverse)
 library(caret)
 library(MASS)
 library(car)
-library(moments)
+
+#library(moments)
+?box()
 ```
 
 
@@ -270,76 +272,76 @@ Lasso regression for comparison to Forward Stepwise
 #   return(mean((y.predict - y.test)^2))
 # }
 
-xy.splits <- list('income' = income.data.split, 
-                  'industry' = industry.data.split, 
-                  'income.sat' = income.data.split.sat, 
-                  'industry.sat' = industry.data.split.sat)
-
-lasso.list <- c('income', 'industry', 'income.sat', 'industry.sat')
-baseline.list <- c('income.sat', 'industry.sat', 'income.sat', 'industry.sat')
-ridge.alpha <- 0
-
-for (a in 1:4){
-  i = lasso.list[a]
-  b = baseline.list[a]
-  X.train <- xy.splits[[i]][['X.train']]
-  y.train <- xy.splits[[i]][['y.train']]
-  X.test <- xy.splits[[i]][['X.test']]
-  y.test <- xy.splits[[i]][['y.test']]
-  X.test.sat <- xy.splits[[b]][['X.test']]
-  y.test.sat <- xy.splits[[b]][['y.test']]
-  data.train <- xy.splits[[i]][['data.train']]
-  data.test <- xy.splits[[i]][['data.test']]
-  
-  #create lambda grid
-  lambda.grid = 10^seq(2, -5, length = 100)
-  
-  #create lasso models with lambda.grid
-  lasso.models = glmnet(X.train, y.train, alpha = ridge.alpha, lambda = lambda.grid)
-  
-  #visualize coefficient shrinkage
-  plot(lasso.models, xvar = "lambda", label = TRUE, main = paste("Lasso Regression:", i))
-  
-  #Cross Validation to find best lambda
-  set.seed(0)
-  cv.lasso.models <- cv.glmnet(X.train, y.train, alpha = ridge.alpha, lambda = lambda.grid, nfolds = 10)
-  
-  #visualize cross validation for lambda that minimizes the mean squared error.
-  plot(cv.lasso.models, main = paste("Lasso Regression:", i))
-  
-  #Checking the best lambda
-  log(cv.lasso.models$lambda.min)
-  best.lambda <- cv.lasso.models$lambda.min
-  print(paste(i, ' best.lambda:', best.lambda))
-  # best lambda with all the variables was found to be 0.0006892612
-  # best lambda with only the bwdBIC coefficients included was found to be 0.0003053856
-  
-  #looking at the lasso coefficients for the best.lambda
-  best.lambda.coeff <- predict(lasso.models, s = best.lambda, type = "coefficients")
-  print('Number of Coefficients:')
-  print(dim(best.lambda.coeff)[1])
-  
-  #fitting a model with the best lambda found to be 0.000689 and using it to make predictions for the testing data.
-  lasso.best.lambda.train.pred <- predict(lasso.models, s = best.lambda, newx = X.test)
-  lasso.best.lambda.train.pred
-  
-  #checking MSE
-  MSE.lasso <- mean((lasso.best.lambda.train.pred - y.test)^2)
-  sat.model.bc <- lm(Avg.bc ~., data = data.train)
-  
-  
-  temp.df <- as.data.frame(X.test.sat) #temp fix
-  colnames(temp.df) <- str_replace_all(colnames(temp.df), "[`]", '')
-  
-  y.predict <- predict(sat.model.bc, newdata = temp.df)
-  MSE.sat <- mean((y.predict - y.test.sat)^2)
-  
-  print(paste(i, ' Lasso MSE: ', MSE.lasso, ' ', b, ' Saturated MSE: ', MSE.sat))
-
-  metrics <- eval_results(y.test, lasso.best.lambda.train.pred, data.test)
-  print(metrics)
-  print('********************************')
-}
+# xy.splits <- list('income' = income.data.split, 
+#                   'industry' = industry.data.split, 
+#                   'income.sat' = income.data.split.sat, 
+#                   'industry.sat' = industry.data.split.sat)
+# 
+# lasso.list <- c('income', 'industry', 'income.sat', 'industry.sat')
+# baseline.list <- c('income.sat', 'industry.sat', 'income.sat', 'industry.sat')
+# ridge.alpha <- 0
+# 
+# for (a in 1:4){
+#   i = lasso.list[a]
+#   b = baseline.list[a]
+#   X.train <- xy.splits[[i]][['X.train']]
+#   y.train <- xy.splits[[i]][['y.train']]
+#   X.test <- xy.splits[[i]][['X.test']]
+#   y.test <- xy.splits[[i]][['y.test']]
+#   X.test.sat <- xy.splits[[b]][['X.test']]
+#   y.test.sat <- xy.splits[[b]][['y.test']]
+#   data.train <- xy.splits[[i]][['data.train']]
+#   data.test <- xy.splits[[i]][['data.test']]
+#   
+#   #create lambda grid
+#   lambda.grid = 10^seq(2, -5, length = 100)
+#   
+#   #create lasso models with lambda.grid
+#   lasso.models = glmnet(X.train, y.train, alpha = ridge.alpha, lambda = lambda.grid)
+#   
+#   #visualize coefficient shrinkage
+#   plot(lasso.models, xvar = "lambda", label = TRUE, main = paste("Lasso Regression:", i))
+#   
+#   #Cross Validation to find best lambda
+#   set.seed(0)
+#   cv.lasso.models <- cv.glmnet(X.train, y.train, alpha = ridge.alpha, lambda = lambda.grid, nfolds = 10)
+#   
+#   #visualize cross validation for lambda that minimizes the mean squared error.
+#   plot(cv.lasso.models, main = paste("Lasso Regression:", i))
+#   
+#   #Checking the best lambda
+#   log(cv.lasso.models$lambda.min)
+#   best.lambda <- cv.lasso.models$lambda.min
+#   print(paste(i, ' best.lambda:', best.lambda))
+#   # best lambda with all the variables was found to be 0.0006892612
+#   # best lambda with only the bwdBIC coefficients included was found to be 0.0003053856
+#   
+#   #looking at the lasso coefficients for the best.lambda
+#   best.lambda.coeff <- predict(lasso.models, s = best.lambda, type = "coefficients")
+#   print('Number of Coefficients:')
+#   print(dim(best.lambda.coeff)[1])
+#   
+#   #fitting a model with the best lambda found to be 0.000689 and using it to make predictions for the testing data.
+#   lasso.best.lambda.train.pred <- predict(lasso.models, s = best.lambda, newx = X.test)
+#   lasso.best.lambda.train.pred
+#   
+#   #checking MSE
+#   MSE.lasso <- mean((lasso.best.lambda.train.pred - y.test)^2)
+#   sat.model.bc <- lm(Avg.bc ~., data = data.train)
+#   
+#   
+#   temp.df <- as.data.frame(X.test.sat) #temp fix
+#   colnames(temp.df) <- str_replace_all(colnames(temp.df), "[`]", '')
+#   
+#   y.predict <- predict(sat.model.bc, newdata = temp.df)
+#   MSE.sat <- mean((y.predict - y.test.sat)^2)
+#   
+#   print(paste(i, ' Lasso MSE: ', MSE.lasso, ' ', b, ' Saturated MSE: ', MSE.sat))
+# 
+#   metrics <- eval_results(y.test, lasso.best.lambda.train.pred, data.test)
+#   print(metrics)
+#   print('********************************')
+# }
 ```
 
 Function to show metrics (R^2 and MSE) for Regularization (Ridge/Lasso)
@@ -385,7 +387,6 @@ regularization_func <- function (data, alpha, name){
   #fitting a model with the best lambda found to be 0.000689 and using it to make predictions for the testing data.
   lasso.best.lambda.train.pred <- predict(lasso.models, s = cv.lasso.models$lambda.min, newx = X.test)
   lasso.best.lambda.train.pred
-  
   
   #checking MSE
   MSE.lasso <- mean((lasso.best.lambda.train.pred - y.test)^2)
