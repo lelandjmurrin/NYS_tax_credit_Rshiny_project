@@ -48,27 +48,45 @@ dashboardPage(
                   fluidRow(column(12, box(h2("Correlations Plots"), width = NULL, plotOutput("correlations",  height = 600)))
                           )
                   ),
+          # tabItem(tabName = 'distributions',
+          #         fluidRow(
+          #           box(h2("Number of Taxpayers"), width = NULL, plotOutput("distributions.taxpayer",  height = 700)),
+          #                   box(h2("Amount of Credit per Taxpayer"), width = NULL, plotOutput("distributions.credit",  height = 700))
+          #                 )
+          #         ),
           tabItem(tabName = 'distributions',
                   fluidRow(
-                    box(h2("Number of Taxpayers"), width = NULL, plotOutput("distributions.taxpayer",  height = 700)),
-                            box(h2("Amount of Credit per Taxpayer"), width = NULL, plotOutput("distributions.credit",  height = 700))
+                            tabBox(
+                                    width = NULL,
+                                    tabPanel("Number of Taxpayers", plotOutput("distributions.taxpayer",height = 700)),
+                                    tabPanel("Amount of Credit per Taxpayer", plotOutput("distributions.credit", height = 700))
+                                  )
                           )
-                  ),
+                ),
           tabItem(tabName = 'methods',
                   textOutput('methods')
+                  ),
+          tabItem(tabName = 'results',
+                  fluidRow(
+                              tabBox(
+                                      width = NULL,
+                                      tabPanel("Raw Data", dataTableOutput("sample2")),
+                                      tabPanel("Cleaned Data", dataTableOutput("results.cleaned"))
+                                    )
+                          )
                   )
           # tabItem(tabName = 'results',
           #         fluidRow(
           #                 box(h2("Raw Data"),
           #                     width = NULL,
-          #                     dataTableOutput("sample")
-          #                     )
+          #                     dataTableOutput("sample2")
+          #                     ),
           #                 box(h2("Cleaned Data"),
           #                     width = NULL,
           #                     dataTableOutput("results.cleaned")
           #                     )
           #                 )
-          #         ) NEXT TIME (fix issue with output token "sample" can't be called in 2 places)
+          #         )
               )
               )
 )

@@ -2,27 +2,19 @@ library(shiny)
 
 
 function(input, output){
+  
+#Reactive Expressions
+  
+  #Changes the selected dataframe between income and industry 
   selected.df <- reactive({
     all.dataframes[[input$dataset]]
-  })
+  }) 
   
-  selected.sample <- reactive({
-    all.samples.credit.name[[input$dataset]]
-  })
+  #EDA Section--------------------------------------------------------------------------------------------------------------------------------------------
   
-  selected.results <- reactive({
-    all.samples.credit.name[[paste(input$dataset, '_cleaned')]]
-  })
-  
-  selected.grouping <- reactive({
-    as.formula(input$grouping)
-  })
-  
-  
-  output$background <- renderUI({includeHTML('background.html')})
-  
-  output$sample <- renderDataTable(
-    selected.df() %>% 
+  #Changes the selected raw sample data records between income and industry and Credit Names
+  sample.df <- reactive({
+    all.dataframes[[input$dataset]] %>% 
       select(`Tax Year`, 
              `Credit Type`, 
              `Credit Name`, 
@@ -30,21 +22,53 @@ function(input, output){
              `Number of Taxpayers`,
              `Amount of Credit`) %>% 
       filter(`Tax Year` == 2019, 
-             `Credit Name` == selected.sample(),
-             `Credit Type` == 'Credit Earned')
-  )
+             `Credit Name` == all.samples.credit.name[[input$dataset]],
+             `Credit Type` == 'Credit Earned') %>%
+      select(-`Credit Type`)
+  })
   
+  #Changes the group category (Year, Group and Credit Name) for the facetwraps in the Distribution Section of EDA
+  selected.grouping <- reactive({
+    as.formula(input$grouping)
+  })
+  
+  #Transform Section---------------------------------------------------------------------------------------------------------------------------------------
+  
+  #Changes the selected cleaned sample data records between income and industry and Credit Names
+  sample.df_cleaned <- reactive({
+    all.dataframes[[paste0(input$dataset, '_cleaned')]] %>%
+      filter(Year == 2019, Name == all.samples.credit.name[[paste0(input$dataset, '_cleaned')]])
+  })
+  
+
+#Output Variables
+  
+  #EDA Section----------------------------------------------------------------------------------------------------------------------------------------------
+  
+  #Returns the data from the background.html file for the background tab
+  output$background <- renderUI({includeHTML('background.html')})
+  
+  #Returns the raw sample data
+  output$sample <- renderDataTable(sample.df())
+
+  #Returns the correlation plot of the raw data
   output$correlations <- renderPlot(
     selected.df() %>% 
-      filter(`Number of Taxpayers` > 0) %>% 
-      mutate(`Number of Taxpayers` = log(`Number of Taxpayers` + 1)) %>% 
-      select(`Tax Year`, 
-             `Number of Taxpayers`, 
-             `Amount of Credit`, 
-             `Mean Amount of Credit`) %>% 
+      filter(`Number of Taxpayers` > 0,
+             `Amount of Credit` > 0,
+             `Mean Amount of Credit` > 0,
+             Group != 'Total') %>%
+      mutate(`Log Number of Taxpayers` = log(`Number of Taxpayers`),
+             `Log Amount of Credit` = log(`Amount of Credit`),
+             `Log Mean Amount of Credit` = log(`Mean Amount of Credit`)) %>%
+      select(`Tax Year`,
+             `Log Number of Taxpayers`,
+             `Log Amount of Credit`,
+             `Log Mean Amount of Credit`) %>%
       chart.Correlation(histogram = T)
   )
   
+  #Returns the histogram distributions for Log Number of Taxpayers by each of the groupings (Year, Name, Group)
   output$distributions.taxpayer <- renderPlot(
     selected.df() %>% 
       mutate(log_taxpayers = log(`Number of Taxpayers` + 1)) %>% 
@@ -57,6 +81,7 @@ function(input, output){
       facet_wrap(selected.grouping())
   )
   
+  #Returns the histogram distributions for Mean Amount of Credit per Taxpayer by each of the groupings (Year, Name, Group)
   output$distributions.credit <- renderPlot(
     selected.df() %>% 
       filter(`Mean Amount of Credit` > 0) %>% 
@@ -64,16 +89,19 @@ function(input, output){
       ggplot(aes(log_mean_amount)) + 
       labs(x = 'Log Taxpayers', 
            y = 'Count', 
-           title = 'Mean Amount of Credit per Taxpayer by Tax Year') +
+           title = paste0('Mean Amount of Credit per Taxpayer by ', all.vars(selected.grouping())[2])) +
       geom_histogram() + 
       facet_wrap(selected.grouping())
-  )
+  ) #TO DO: change the title to input the selected grouping instead of hardcoded Tax Year
   
+  #Transform Section---------------------------------------------------------------------------------------------------------------------------------------
+  
+  #Returns the methods used for transforming the data within a methods.text file (joining, filtering, imputation, adding Avg, dropping 0 etc...)
   output$methods <- renderText({includeText('methods.txt')})
   
+  #Returns the raw sample dataset for comparison with cleaned sample dataset in Results tab
+  output$sample2 <- renderDataTable(sample.df())
   
-  output$results.cleaned <- renderDataTable(
-    income_cleaned %>% 
-      filter(Year == 2019, Name == 'Alcoholic Beverage Production Credit')
-  )
+  #Returns the cleaned sample dataset
+  output$results.cleaned <- renderDataTable(sample.df_cleaned())
 }
