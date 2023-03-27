@@ -73,6 +73,8 @@ NYS_tax_credit_net_income %>% filter(`Mean Amount of Credit` > 0) %>% mutate(log
 
 ```{r}
 NYS_tax_credit_net_income %>% filter(`Mean Amount of Credit` > 0) %>% mutate(log_mean_amount = log(`Mean Amount of Credit`)) %>% ggplot(aes(log_mean_amount)) + geom_histogram() + facet_wrap(~ `Tax Year`)
+
+?ggplot()
 ```
 
 ```{r}

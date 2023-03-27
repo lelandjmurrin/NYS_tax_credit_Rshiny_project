@@ -4,25 +4,22 @@ library(shiny)
 function(input, output){
   selected.df <- reactive({
     all.dataframes[[input$dataset]]
-    # flights %>%
-    #   filter(origin == input$origin,
-    #          dest == input$dest,
-    #          month == input$month)
   })
   
   selected.sample <- reactive({
     all.samples.credit.name[[input$dataset]]
   })
   
-  selected.facetwrap <- reactive({
-    input$facetwrap
+  selected.results <- reactive({
+    all.samples.credit.name[[paste(input$dataset, '_cleaned')]]
   })
   
-  getpage <- function (){
-    return (includeHTML('background.html'))
-  }
+  selected.grouping <- reactive({
+    as.formula(input$grouping)
+  })
   
-  output$background <- renderUI({getpage()})
+  
+  output$background <- renderUI({includeHTML('background.html')})
   
   output$sample <- renderDataTable(
     selected.df() %>% 
@@ -30,7 +27,7 @@ function(input, output){
              `Credit Type`, 
              `Credit Name`, 
              Group,
-             `Number of Taxpayers`, 
+             `Number of Taxpayers`,
              `Amount of Credit`) %>% 
       filter(`Tax Year` == 2019, 
              `Credit Name` == selected.sample(),
@@ -53,32 +50,30 @@ function(input, output){
       mutate(log_taxpayers = log(`Number of Taxpayers` + 1)) %>% 
       filter(log_taxpayers > 0) %>% 
       ggplot(aes(`log_taxpayers`)) + 
+      labs(x = 'Log Taxpayers', 
+           y = 'Count', 
+           title = 'Taxpayer Distribution by Tax Year') +
       geom_histogram() + 
-      facet_wrap(~ `Tax Year`)
+      facet_wrap(selected.grouping())
   )
-  # output$months <- renderPlot(
-  #   flights_delay() %>% 
-  #     mutate(month = as.factor(month)) %>% 
-  #     ggplot(aes(month)) + 
-  #     geom_bar()
-  # )
-  # output$delay <- renderPlot(
-  #   flights_delay() %>%
-  #     group_by(carrier) %>% 
-  #     summarise(departure = mean(dep_delay), 
-  #               arrival = mean(arr_delay)) %>% 
-  #     pivot_longer(c(departure, arrival), 
-  #                  names_to = 'type', 
-  #                  values_to = 'delay') %>% 
-  #     ggplot(aes(carrier, delay, fill = type)) + 
-  #     geom_col(position = 'dodge') +
-  #     ggtitle('Average delay')
-  # )
-  # output$table <- renderDataTable(
-  #   flights_delay() %>% group_by(carrier) %>% 
-  #     summarise(departure_delay = mean(dep_delay), 
-  #               arrival_delay = mean(arr_delay), 
-  #               month = max(month), 
-  #               number_of_flights = n())
-  # )
+  
+  output$distributions.credit <- renderPlot(
+    selected.df() %>% 
+      filter(`Mean Amount of Credit` > 0) %>% 
+      mutate(log_mean_amount = log(`Mean Amount of Credit`)) %>% 
+      ggplot(aes(log_mean_amount)) + 
+      labs(x = 'Log Taxpayers', 
+           y = 'Count', 
+           title = 'Mean Amount of Credit per Taxpayer by Tax Year') +
+      geom_histogram() + 
+      facet_wrap(selected.grouping())
+  )
+  
+  output$methods <- renderText({includeText('methods.txt')})
+  
+  
+  output$results.cleaned <- renderDataTable(
+    income_cleaned %>% 
+      filter(Year == 2019, Name == 'Alcoholic Beverage Production Credit')
+  )
 }

@@ -1,5 +1,4 @@
 library(tidyverse)
-library(caret)
 library(PerformanceAnalytics)
 library(car)
 
@@ -17,15 +16,15 @@ NYS_tax_credit_industry <- credit_name_func(read_csv('../NYS_Corp_Tax_Credit_dat
 colnames(NYS_tax_credit_net_income)[5] <- 'Group'
 colnames(NYS_tax_credit_industry)[5] <- 'Group'
 
-all.dataframes <- list('income' = NYS_tax_credit_net_income, 'industry' = NYS_tax_credit_industry)
-all.samples.credit.name <- list('income' = 'Alcoholic Beverage Production Credit', 'industry' = 'Investment Tax Credit')
+income_cleaned <- read_csv('../NYS_Corp_Tax_Credit_data/income_cleaned.csv')
+industry_cleaned <- read_csv('../NYS_Corp_Tax_Credit_data/industry_cleaned.csv')
 
+all.dataframes <- list('income' = NYS_tax_credit_net_income, 
+                       'industry' = NYS_tax_credit_industry, 
+                       'income_cleaned' = income_cleaned, 
+                       'industry_cleaned' = industry_cleaned)
 
-
-
-# flights <- read.csv(file = "./flights14.csv")
-# 
-# origin_values <- flights %>% select(origin) %>% distinct()
-# dest_values <- flights %>% select(dest) %>% distinct()
-# month_values <- flights %>% select(month) %>% distinct()
-
+all.samples.credit.name <- list('income' = 'Alcoholic Beverage Production Credit', 
+                                'industry' = 'Investment Tax Credit',
+                                'income_cleaned' = 'Alcoholic Beverage Production Credit',
+                                'industry_cleaned' = 'Investment Tax Credit')

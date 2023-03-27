@@ -8,9 +8,7 @@ library(tidyverse)
 library(caret)
 library(MASS)
 library(car)
-
-#library(moments)
-?box()
+library(moments)
 ```
 
 
@@ -70,7 +68,7 @@ bc_func <- function (lm.cleaned, lambda.range){
   #Extracting the best lambda value.
   return(bc$x[which(bc$y == max(bc$y))])
 }
-  
+
 #Income Group Dataset
 income.lambda.bc = bc_func(income.model, seq(-0.2, 0.2, 1/10))
 income.lambda.bc
