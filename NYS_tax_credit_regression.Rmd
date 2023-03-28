@@ -56,9 +56,14 @@ sat.field <- 'Avg'
 sat.model.summary(income_cleaned, sat.field, sat.formula)
 income.model <- lm(sat.formula, data = income_cleaned)
 
-
 sat.model.summary(industry_cleaned, sat.field, sat.formula)
 industry.model <- lm(sat.formula, data = industry_cleaned)
+```
+
+
+```{r}
+plot(income.model, which = 6)
+plot(income.model, which = 1)
 ```
 
 Correcting violation of Normality in previous model with BoxCox transform

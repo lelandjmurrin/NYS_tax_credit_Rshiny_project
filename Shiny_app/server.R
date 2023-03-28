@@ -6,9 +6,9 @@ function(input, output){
 #Reactive Expressions
   
   #Changes the selected dataframe between income and industry 
-  selected.df <- reactive({
-    all.dataframes[[input$dataset]]
-  }) 
+  selected.df <- reactive({all.dataframes[[input$dataset]]}) 
+  
+  selected.df.index <- reactive({input$dataset})
   
   #EDA Section--------------------------------------------------------------------------------------------------------------------------------------------
   
@@ -40,13 +40,18 @@ function(input, output){
       filter(Year == 2019, Name == all.samples.credit.name[[paste0(input$dataset, '_cleaned')]])
   })
   
+  #Regression Section---------------------------------------------------------------------------------------------------------------------------------------
+  
+  boxcox.model <- reactive({
+    lm(Avg ~ ., data = income_cleaned)
+  })
 
 #Output Variables
   
   #EDA Section----------------------------------------------------------------------------------------------------------------------------------------------
   
   #Returns the data from the background.html file for the background tab
-  output$background <- renderUI({includeHTML('background.html')})
+  output$background <- renderUI({includeHTML('www/background.html')})
   
   #Returns the raw sample data
   output$sample <- renderDataTable(sample.df())
@@ -97,11 +102,27 @@ function(input, output){
   #Transform Section---------------------------------------------------------------------------------------------------------------------------------------
   
   #Returns the methods used for transforming the data within a methods.text file (joining, filtering, imputation, adding Avg, dropping 0 etc...)
-  output$methods <- renderText({includeText('methods.txt')})
+  output$methods <- renderText({includeText('www/methods.txt')})
   
   #Returns the raw sample dataset for comparison with cleaned sample dataset in Results tab
   output$sample2 <- renderDataTable(sample.df())
   
   #Returns the cleaned sample dataset
   output$results.cleaned <- renderDataTable(sample.df_cleaned())
+  
+  #Regression Section-------------------------------------------------------------------------------------------------------------------------------------
+  
+  #
+  output$pre_bc <- renderPlot(
+    #df = all.dataframes[[paste0(selected.df.index(), '_cleaned')]]
+    plot(boxcox.model(), which = 2)
+  )
+  
+  output$likelihood <- renderImage({
+    filename = paste0('www/', selected.df.index(), '_bc_likelihood_plot.png')
+    list(src = filename,
+         height = 700,
+         contentType = 'image/png')
+  }, deleteFile = F)
 }
+

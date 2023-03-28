@@ -48,12 +48,6 @@ dashboardPage(
                   fluidRow(column(12, box(h2("Correlations Plots"), width = NULL, plotOutput("correlations",  height = 600)))
                           )
                   ),
-          # tabItem(tabName = 'distributions',
-          #         fluidRow(
-          #           box(h2("Number of Taxpayers"), width = NULL, plotOutput("distributions.taxpayer",  height = 700)),
-          #                   box(h2("Amount of Credit per Taxpayer"), width = NULL, plotOutput("distributions.credit",  height = 700))
-          #                 )
-          #         ),
           tabItem(tabName = 'distributions',
                   fluidRow(
                             tabBox(
@@ -74,19 +68,16 @@ dashboardPage(
                                       tabPanel("Cleaned Data", dataTableOutput("results.cleaned"))
                                     )
                           )
-                  )
-          # tabItem(tabName = 'results',
-          #         fluidRow(
-          #                 box(h2("Raw Data"),
-          #                     width = NULL,
-          #                     dataTableOutput("sample2")
-          #                     ),
-          #                 box(h2("Cleaned Data"),
-          #                     width = NULL,
-          #                     dataTableOutput("results.cleaned")
-          #                     )
-          #                 )
-          #         )
+                  ),
+          tabItem(tabName = 'boxcox',
+            fluidRow(
+              tabBox(
+                width = NULL,
+                tabPanel("Analysis of Average", plotOutput('pre_bc')),
+                tabPanel("BoxCox Likelihood", imageOutput('likelihood', height = 700)),
+              )
+            )
+          )
               )
               )
 )
