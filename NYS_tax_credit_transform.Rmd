@@ -12,10 +12,10 @@ library(PerformanceAnalytics)
 
 Load Datasets
 ```{r}
-NYS_tax_credit_used <- read_csv('NYS_Corp_Tax_Credit_data/NYS_tax_credit_used.csv')
-NYS_tax_credit_net_income <- read_csv('NYS_Corp_Tax_Credit_data/NYS_tax_credit_net_income.csv')
-NYS_tax_credit_taxation_basis <- read_csv('NYS_Corp_Tax_Credit_data/NYS_tax_credit_taxation_basis.csv')
-NYS_tax_credit_industry <- read_csv('NYS_Corp_Tax_Credit_data/NYS_tax_credit_industry.csv')
+#NYS_tax_credit_used <- read_csv('NYS_Corp_Tax_Credit_data/NYS_tax_credit_used.csv')
+#NYS_tax_credit_taxation_basis <- read_csv('NYS_Corp_Tax_Credit_data/NYS_tax_credit_taxation_basis.csv')
+NYS_tax_credit_net_income <- read_csv('Shiny_app/data/NYS_tax_credit_net_income.csv')
+NYS_tax_credit_industry <- read_csv('Shiny_app/data/NYS_tax_credit_industry.csv')
 ```
 ***SHINY PREP SECTION***
 
@@ -200,8 +200,8 @@ income_cleaned %>% filter(Year == 2019, Name == 'Alcoholic Beverage Production C
 
 Writing the final cleaned dataset to a csv file for ensuing regression analysis
 ```{r}
-write_csv(industry_cleaned, 'NYS_Corp_Tax_Credit_data/industry_cleaned.csv')
-write_csv(income_cleaned, 'NYS_Corp_Tax_Credit_data/income_cleaned.csv')
+write_csv(industry_cleaned, 'Shiny_app/data/industry_cleaned.csv')
+write_csv(income_cleaned, 'Shiny_app/data/income_cleaned.csv')
 ```
 
 

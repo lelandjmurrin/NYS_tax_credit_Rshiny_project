@@ -1,10 +1,10 @@
 library(shinydashboard)
 
 dashboardPage(
-  dashboardHeader(title='NYS Article 9A Tax Credit Analysis'),
+  dashboardHeader(title='NYS Tax Cred Analysis (Article 9A)'),
   dashboardSidebar(
     sidebarUserPanel("Leland Murrin",
-                     image = 'NYCDSA.png'),
+                     image = 'empire-state-building.png'),
     sidebarMenu(
       selectizeInput('dataset',
                      'Dataset',
@@ -56,7 +56,7 @@ dashboardPage(
                                     tabPanel("Amount of Credit per Taxpayer", plotOutput("distributions.credit", height = 700))
                                   )
                           )
-                ),
+                  ),
           tabItem(tabName = 'methods',
                   textOutput('methods')
                   ),
@@ -66,18 +66,46 @@ dashboardPage(
                                       width = NULL,
                                       tabPanel("Raw Data", dataTableOutput("sample2")),
                                       tabPanel("Cleaned Data", dataTableOutput("results.cleaned"))
-                                    )
+                                   )
                           )
                   ),
           tabItem(tabName = 'boxcox',
             fluidRow(
               tabBox(
                 width = NULL,
-                tabPanel("Analysis of Average", plotOutput('pre_bc')),
-                tabPanel("BoxCox Likelihood", imageOutput('likelihood', height = 700)),
+                tabPanel("Diagnostics of Linear Model Pre-BoxCox", 
+                         fluidRow(
+                            column(6, plotOutput('pre_bc1', height = 350)),
+                            column(6, plotOutput('pre_bc2', height = 350)),
+                            column(6, plotOutput('pre_bc3', height = 350)),
+                            column(6, plotOutput('pre_bc4', height = 350)),
+                            column(6, offset = 3, plotOutput('pre_bc5', height = 350))
+                          )
+                ),
+                tabPanel("BoxCox Likelihood", plotOutput('likelihood', height = 700)),
+                tabPanel("Diagnostics of Linear Model Post-BoxCox",
+                         fluidRow(
+                           column(6, plotOutput('bc1', height = 350)),
+                           column(6, plotOutput('bc2', height = 350)),
+                           column(6, plotOutput('bc3', height = 350)),
+                           column(6, plotOutput('bc4', height = 350)),
+                           column(6, plotOutput('bc5', height = 350), style = 'padding:50px'),
+                           column(6, dataTableOutput('bc6'), style = 'padding:50px')
+                         )
+                )
               )
             )
+          ),
+          tabItem(tabName = 'stepwise_bic',
+              fluidRow(
+                tabBox(
+                  width = NULL,
+                  tabPanel("Stepwise BIC Results",
+                            column(12, dataTableOutput('stepwise_bic'))
+                               )
+                    )
+                  )
           )
-              )
-              )
+      )
+   )
 )

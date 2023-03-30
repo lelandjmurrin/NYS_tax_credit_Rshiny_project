@@ -5,20 +5,16 @@ output: html_notebook
 Call Libraries
 ```{r} 
 library(tidyverse)
-library(caret)
-library(MASS)
 library(car)
 library(moments)
+library(glmnet)
 ```
 
 
 Calling the Transformed Datasets
 ```{r}
-income_cleaned = read_csv('NYS_Corp_Tax_Credit_data/income_cleaned.csv')
-income_cleaned = income_cleaned %>% select(-Amount)
-
-industry_cleaned = read_csv('NYS_Corp_Tax_Credit_data/industry_cleaned.csv')
-industry_cleaned = industry_cleaned %>% select(-Amount)
+income_cleaned = read_csv('Shiny_app/data/income_cleaned.csv')
+industry_cleaned = read_csv('Shiny_app/data/industry_cleaned.csv')
 ```
 
 
@@ -60,11 +56,14 @@ sat.model.summary(industry_cleaned, sat.field, sat.formula)
 industry.model <- lm(sat.formula, data = industry_cleaned)
 ```
 
-
+Selecting Specific Diagnostic plots for linear models
 ```{r}
-plot(income.model, which = 6)
 plot(income.model, which = 1)
+plot(income.model, which = 2)
+plot(income.model, which = 3)
+plot(income.model, which = 5)
 ```
+
 
 Correcting violation of Normality in previous model with BoxCox transform
 ```{r}
@@ -97,6 +96,39 @@ industry_cleaned_bc <- bc_transform(industry_cleaned, industry.lambda.bc)
 industry.model.bc = lm(Avg.bc ~ ., data = industry_cleaned_bc)
 ```
 
+Testing out appending a newly created dataframe to a list of dataframes with a Name for Shiny app
+```{r}
+# income_cleaned_bc
+# all.data <- list('income_cleaned' = income_cleaned, 'industry_cleaned' = industry_cleaned)
+# all.data <- append(all.data, list('income_cleaned_bc' = income_cleaned_bc))
+# all.data[['income_cleaned_bc']]
+```
+
+Testing out bc_func for migration to Shiny App global.R file
+```{r}
+bc_funct <- function (df, lm.cleaned, lambda.range){
+  bc = boxCox(lm.cleaned, lambda = lambda.range)
+  lambda.bc = bc$x[which(bc$y == max(bc$y))]
+  return(df %>% 
+            mutate(Avg.bc = (Avg^lambda.bc -1)/lambda.bc) %>% 
+            select(-c(Avg)))
+}
+
+bc_funct(income_cleaned, income.model, seq(-0.2, 0.2, 1/10))
+```
+```{r}
+bc_func2 <- function (){
+  bc = boxCox(lm(Avg ~ ., data = industry_cleaned), lambda = seq(-0.2, 0.2, 1/10))
+  lambda.bc = bc$x[which(bc$y == max(bc$y))]
+  return(industry_cleaned %>%
+           mutate(Avg.bc = (Avg^lambda.bc -1)/lambda.bc) %>%
+           select(-c(Avg)))
+}
+
+industry_cleaned_bc <-bc_func2()
+industry_cleaned_bc
+```
+
 Checking linear regression assumptions for the transformed data.
 ```{r}
 sat.formula.bc <- Avg.bc ~ .
@@ -107,6 +139,10 @@ sat.model.summary(income_cleaned_bc, sat.field.bc, sat.formula.bc)
 
 #Industry
 sat.model.summary(industry_cleaned_bc, sat.field.bc, sat.formula.bc)
+```
+
+```{r}
+avPlots(income.model.bc)
 ```
 
 BIC comparison before and after BoxCox transform
@@ -169,14 +205,20 @@ bic_func <- function (BIC.model){
   print('VIF Check: ')
   print(max(vif(BIC.model)))
   print("*************************")
+  return(c(summary(BIC.model)$adj.r.squared, dim(summary(BIC.model)$coefficient)[1], max(vif(BIC.model))))
 }
+
+as.data.frame(rbind(c('income', 'forward', bic_func(forwardBIC[['income']])),
+      c('income', 'backward', bic_func(backwardBIC[['income']])),
+      c('industry', 'forward', bic_func(forwardBIC[['industry']])),
+      c('industry', 'backward', bic_func(backwardBIC[['industry']]))
+      )
+) %>% select(dataset = V1, Stepwise = V2, `Adjusted R^2` = V3, `Number of Coefficients` = V4, `Maximum VIF` = V5) %>% write_csv('Shiny_app/data/stepwiseBIC_results.csv')
 
 bic_func(forwardBIC[['income']])
 bic_func(backwardBIC[['income']])
 bic_func(forwardBIC[['industry']]) 
 bic_func(backwardBIC[['industry']])
-
-
 
 #Manual reduction of variables using VIF and then checked versus saturated model with Anova. This was not used because the saturated model contained multicollinearity issues as indicated by a high VIF score on some coefficients. And the anova test suggested that the coefficients removed in the reduced model were informative in our model, so we couldn't use it either. Thus Stepwise reduction is the preferred method for best model fit.
 
@@ -264,7 +306,6 @@ industry.data.split.sat <- test_train_split(industry.dummy.bc, Avg.bc ~ .)
 industry.data.split <- test_train_split(industry.dummy.bc, industry.best.formula)
 
 test_train_split(income_cleaned, sat.formula)
-
 ```
 
 
@@ -363,14 +404,14 @@ regularization_func <- function (data, alpha, name){
   lambda.grid = 10^seq(10, -10, length = 100)
   
   #create lasso models with lambda.grid
-  lasso.models = glmnet(X.train, y.train, alpha = ridge.alpha, lambda = lambda.grid)
+  lasso.models = glmnet(X.train, y.train, alpha = alpha, lambda = lambda.grid)
   
   #visualize coefficient shrinkage
   # plot(lasso.models, xvar = "lambda", label = TRUE, main = paste("Lasso Regression:", i))
   
   #Cross Validation to find best lambda
   set.seed(0)
-  cv.lasso.models <- cv.glmnet(X.train, y.train, alpha = ridge.alpha, lambda = lambda.grid, nfolds = 10)
+  cv.lasso.models <- cv.glmnet(X.train, y.train, alpha = alpha, lambda = lambda.grid, nfolds = 10)
   
   #visualize cross validation for lambda that minimizes the mean squared error.
   plot(cv.lasso.models, main = paste("Alpha:", alpha, "Regression:", name))
@@ -402,6 +443,7 @@ regularization_func <- function (data, alpha, name){
 regularization_func(all.splits[['income_cleaned']], 0, 'income_cleaned')
 regularization_func(all.splits[['income_cleaned_bc']], 0, 'income_cleaned_bc')
 regularization_func(all.splits[['income.data.split.sat']], 0, 'income.data.split.sat')
+
 ```
 
 
@@ -481,7 +523,7 @@ df.rsquare
 
 
 ```{r}
-# Compute R^2 from true and predicted values
+# Calculate R squared from true values and predictions
 eval_results <- function(true, predicted, df, p) {
   n = nrow(df)
   adj.RSS <- sum((predicted - true)^2)/(n-p-1)
@@ -502,6 +544,8 @@ eval_results <- function(true, predicted, df, p) {
 
 
 
+
+Additional Calculations
 ```{r}
 as.data.frame(lasso.best.lambda.train.pred) %>% mutate(Avg_in_dollars = (lasso.best.lambda.train.pred*lambda.bc+1)^(1/lambda.bc))
 ```

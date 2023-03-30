@@ -3,10 +3,12 @@ library(shiny)
 
 function(input, output){
   
-#Reactive Expressions
+#REACTIVE EXPRESSIONS
   
   #Changes the selected dataframe between income and industry 
-  selected.df <- reactive({all.dataframes[[input$dataset]]}) 
+  selected.df <- reactive({all.dataframes[[input$dataset]]})
+
+  selected.df.cleaned <- reactive({all.dataframes[[paste0(input$dataset, '_cleaned')]]})
   
   selected.df.index <- reactive({input$dataset})
   
@@ -14,8 +16,8 @@ function(input, output){
   
   #Changes the selected raw sample data records between income and industry and Credit Names
   sample.df <- reactive({
-    all.dataframes[[input$dataset]] %>% 
-      select(`Tax Year`, 
+    selected.df() %>% #CHANGED THIS MARCH 28
+      select(`Tax Year`,
              `Credit Type`, 
              `Credit Name`, 
              Group,
@@ -26,7 +28,7 @@ function(input, output){
              `Credit Type` == 'Credit Earned') %>%
       select(-`Credit Type`)
   })
-  
+
   #Changes the group category (Year, Group and Credit Name) for the facetwraps in the Distribution Section of EDA
   selected.grouping <- reactive({
     as.formula(input$grouping)
@@ -36,17 +38,24 @@ function(input, output){
   
   #Changes the selected cleaned sample data records between income and industry and Credit Names
   sample.df_cleaned <- reactive({
-    all.dataframes[[paste0(input$dataset, '_cleaned')]] %>%
+    selected.df.cleaned() %>%
       filter(Year == 2019, Name == all.samples.credit.name[[paste0(input$dataset, '_cleaned')]])
   })
   
   #Regression Section---------------------------------------------------------------------------------------------------------------------------------------
   
-  boxcox.model <- reactive({
-    lm(Avg ~ ., data = income_cleaned)
+  pre.boxcox.model <- reactive({
+      lm(Avg ~ ., data = all.dataframes[[paste0(input$dataset, '_cleaned')]])
   })
-
-#Output Variables
+  
+  boxcox.model <- reactive({
+    lm(Avg.bc ~ ., data = all.dataframes[[paste0(input$dataset, '_cleaned_bc')]]) 
+  })
+  
+  
+  
+  
+#OUTPUT VARIABLES
   
   #EDA Section----------------------------------------------------------------------------------------------------------------------------------------------
   
@@ -81,7 +90,7 @@ function(input, output){
       ggplot(aes(`log_taxpayers`)) + 
       labs(x = 'Log Taxpayers', 
            y = 'Count', 
-           title = 'Taxpayer Distribution by Tax Year') +
+           title = paste0('Taxpayer Distribution by ', all.vars(selected.grouping())[1])) + 
       geom_histogram() + 
       facet_wrap(selected.grouping())
   )
@@ -92,9 +101,9 @@ function(input, output){
       filter(`Mean Amount of Credit` > 0) %>% 
       mutate(log_mean_amount = log(`Mean Amount of Credit`)) %>% 
       ggplot(aes(log_mean_amount)) + 
-      labs(x = 'Log Taxpayers', 
+      labs(x = 'Log Mean Amount', 
            y = 'Count', 
-           title = paste0('Mean Amount of Credit per Taxpayer by ', all.vars(selected.grouping())[2])) +
+           title = paste0('Amount of Credit per Taxpayer by ', all.vars(selected.grouping())[1])) + 
       geom_histogram() + 
       facet_wrap(selected.grouping())
   ) #TO DO: change the title to input the selected grouping instead of hardcoded Tax Year
@@ -112,17 +121,74 @@ function(input, output){
   
   #Regression Section-------------------------------------------------------------------------------------------------------------------------------------
   
-  #
-  output$pre_bc <- renderPlot(
-    #df = all.dataframes[[paste0(selected.df.index(), '_cleaned')]]
-    plot(boxcox.model(), which = 2)
+  output$pre_bc1 <- renderPlot(
+    plot(pre.boxcox.model(), which = 1)
+  )
+
+  output$pre_bc2 <- renderPlot(
+    plot(pre.boxcox.model(), which = 2)
   )
   
-  output$likelihood <- renderImage({
-    filename = paste0('www/', selected.df.index(), '_bc_likelihood_plot.png')
-    list(src = filename,
-         height = 700,
-         contentType = 'image/png')
-  }, deleteFile = F)
-}
+  output$pre_bc3 <- renderPlot(
+    plot(pre.boxcox.model(), which = 3)
+  )
+  
+  output$pre_bc4 <- renderPlot(
+    plot(pre.boxcox.model(), which = 5)
+  )
 
+  output$pre_bc5 <- renderPlot(
+    all.dataframes[[paste0(input$dataset, '_cleaned')]] %>%
+      ggplot(aes(Avg)) + 
+      geom_histogram(bins = 30) + 
+      labs(title = 'Average Credit Amount Distribution') + 
+      theme(plot.title = element_text(hjust = 0.5))
+  )
+
+  # output$likelihood2 <- renderImage({
+  #   filename = paste0('www/', selected.df.index(), '_bc_likelihood_plot.png')
+  #   list(src = filename,
+  #        height = 700,
+  #        contentType = 'image/png')
+  # }, deleteFile = F)
+  
+  output$likelihood <- renderPlot(
+    ifelse(input$dataset == 'income', 
+           boxCox(lm(Avg ~ ., data = all.dataframes[['income_cleaned']]), seq(-0.2, 0.2, 1/10)),
+           boxCox(lm(Avg ~ ., data = all.dataframes[['industry_cleaned']]), seq(-0.2, 0.2, 1/10))
+           ) 
+  )
+
+  output$bc1 <- renderPlot(
+    plot(boxcox.model(), which = 1)
+  )
+
+  output$bc2 <- renderPlot(
+    plot(boxcox.model(), which = 2)
+  )
+
+  output$bc3 <- renderPlot(
+    plot(boxcox.model(), which = 3)
+  )
+
+  output$bc4 <- renderPlot(
+    plot(boxcox.model(), which = 5)
+  )
+
+  output$bc5 <- renderPlot(
+    all.dataframes[[paste0(input$dataset, '_cleaned_bc')]] %>%
+      ggplot(aes(Avg.bc)) +
+      geom_histogram(bins = 30) +
+      labs(title = 'Average Credit Amount Distribution') +
+      theme(plot.title = element_text(hjust = 0.5))
+  )
+  
+  output$bc6 <- renderDataTable(
+    BIC(boxcox.model(), pre.boxcox.model()) %>% tibble::rownames_to_column(var = 'model') %>% mutate(model = str_replace_all(model, '.model[()]+', ''))
+  )
+  
+  output$stepwise_bic <- renderDataTable(
+    stepwise_BIC %>% filter(dataset == input$dataset) %>% select(-dataset)
+  )
+
+}
