@@ -1,0 +1,26 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Generating predictions using best model
+```{r}
+#Making predictions using best model on our full dataset
+forwardBIC.predict.bc <- predict(forwardBIC[['income']], newdata = all.splits[['income.data.split.best']][['data']])
+
+#Converting those target variable predictions from BoxCox transform back to Dollars
+predictions.df <- as.data.frame(forwardBIC.predict.bc) %>% mutate(`Predicted Average in Dollars` = (forwardBIC.predict.bc*income.lambda.bc+1)^(1/income.lambda.bc)) %>% tibble::rownames_to_column(var = 'Index')
+predictions.df
+
+data.df <- income_cleaned_bc %>% tibble::rownames_to_column(var = 'Index')
+data.df
+
+#joining the predicted data with the original dataset
+joined.pred.df <- inner_join(predictions.df, data.df, by = 'Index')
+joined.pred.df
+
+#Creating Master dataset with True Avg.bc, Predicted Avg.bc, True Average in Dollars and Predicted Average in Dollars for each Year, Credit Name and Income Group entry.
+income.joined.true.pred <- joined.pred.df %>% mutate(`True Average in Dollars` = (Avg.bc*income.lambda.bc+1)^(1/income.lambda.bc)) %>% relocate(`True Average in Dollars`, .before = `Predicted Average in Dollars`) %>% relocate(Avg.bc, .before = forwardBIC.predict.bc) %>% select(1:8, `Predicted Avg.bc` = forwardBIC.predict.bc, `True Avg.bc` = Avg.bc)
+income.joined.true.pred
+```
+

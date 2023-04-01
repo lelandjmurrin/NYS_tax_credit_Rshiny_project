@@ -16,6 +16,7 @@ Load Datasets
 #NYS_tax_credit_taxation_basis <- read_csv('NYS_Corp_Tax_Credit_data/NYS_tax_credit_taxation_basis.csv')
 NYS_tax_credit_net_income <- read_csv('Shiny_app/data/NYS_tax_credit_net_income.csv')
 NYS_tax_credit_industry <- read_csv('Shiny_app/data/NYS_tax_credit_industry.csv')
+head(NYS_tax_credit_industry)
 ```
 ***SHINY PREP SECTION***
 

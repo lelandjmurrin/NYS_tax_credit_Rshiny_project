@@ -1,0 +1,28 @@
+<HMTL>
+<HEAD>
+<TITLE>webpage1</TITLE>
+</HEAD>
+<BODY BGCOLOR="FFFFFf" LINK="006666" ALINK="8B4513" VLINK="006666">
+    <h1 class="tax-page-title">Data Transformation Steps</h1>
+    <p>These are the steps that were used to transform the raw data to a cleaned version that was used for the regression step in this model.</p>
+    <h2>Steps:</h2>
+    <ol>
+    <li>Filtered 'Credit Type' field to only consider 'Credit Earned'</li>
+    <li>Split the dataset into known Totals for each 'Credit Name' and other records</li>
+    <li>Joined the two tables on 'Tax Year' and 'Credit Name'</li>
+    <li>Filtered out any missing Total Values that prevent imputation</li>
+    <li>For the missing values, calculated the average 'Number of Taxpayers' and average 'Amount of Credit' </li>
+    <li>Imputed the average values into the missing values</li>
+    <li>Calculated the average amount of credit earned per taxpayer ('Avg') and being careful not to divide by 0 </li>
+    <li>The following columns were selected: 'Tax Year', 'Credit Name', 'Income/Industry Group', 'Number of Taxpayers', and 'Average Amount of Credit per Taxpayer'</li>
+    </ol>
+    <p>GitHub Link<a href = 'https://github.com/lelandjmurrin/NYS_tax_credit_Rshiny_project.git'> Here</a></p>
+</BODY>
+</HTML>
+
+
+
+
+
+
+

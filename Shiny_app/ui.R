@@ -58,7 +58,7 @@ dashboardPage(
                           )
                   ),
           tabItem(tabName = 'methods',
-                  textOutput('methods')
+                  htmlOutput('methods')
                   ),
           tabItem(tabName = 'results',
                   fluidRow(
@@ -103,6 +103,16 @@ dashboardPage(
                   tabPanel("Stepwise BIC Results",
                             column(12, dataTableOutput('stepwise_bic'))
                                )
+                    )
+                  )
+          ),
+          tabItem(tabName = 'conclusions',
+                  fluidRow(
+                    tabBox(
+                      width = NULL,
+                      tabPanel("Summary/Conclusions",
+                               htmlOutput('conclusions')
+                      )
                     )
                   )
           )

@@ -111,7 +111,7 @@ function(input, output){
   #Transform Section---------------------------------------------------------------------------------------------------------------------------------------
   
   #Returns the methods used for transforming the data within a methods.text file (joining, filtering, imputation, adding Avg, dropping 0 etc...)
-  output$methods <- renderText({includeText('www/methods.txt')})
+  output$methods <- renderUI({includeHTML('www/methods.html')})
   
   #Returns the raw sample dataset for comparison with cleaned sample dataset in Results tab
   output$sample2 <- renderDataTable(sample.df())
@@ -190,5 +190,11 @@ function(input, output){
   output$stepwise_bic <- renderDataTable(
     stepwise_BIC %>% filter(dataset == input$dataset) %>% select(-dataset)
   )
+  
+  
+  
+  
+  #Discussion Section ---------------------------------------------------------------------------------------------------------------------------------------------
 
+  output$conclusions <- renderUI({includeHTML('www/conclusions.html')})
 }

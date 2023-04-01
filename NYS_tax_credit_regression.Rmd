@@ -8,6 +8,7 @@ library(tidyverse)
 library(car)
 library(moments)
 library(glmnet)
+detach('package:plyr', unload = T)
 ```
 
 
@@ -96,14 +97,6 @@ industry_cleaned_bc <- bc_transform(industry_cleaned, industry.lambda.bc)
 industry.model.bc = lm(Avg.bc ~ ., data = industry_cleaned_bc)
 ```
 
-Testing out appending a newly created dataframe to a list of dataframes with a Name for Shiny app
-```{r}
-# income_cleaned_bc
-# all.data <- list('income_cleaned' = income_cleaned, 'industry_cleaned' = industry_cleaned)
-# all.data <- append(all.data, list('income_cleaned_bc' = income_cleaned_bc))
-# all.data[['income_cleaned_bc']]
-```
-
 Testing out bc_func for migration to Shiny App global.R file
 ```{r}
 bc_funct <- function (df, lm.cleaned, lambda.range){
@@ -116,6 +109,7 @@ bc_funct <- function (df, lm.cleaned, lambda.range){
 
 bc_funct(income_cleaned, income.model, seq(-0.2, 0.2, 1/10))
 ```
+
 ```{r}
 bc_func2 <- function (){
   bc = boxCox(lm(Avg ~ ., data = industry_cleaned), lambda = seq(-0.2, 0.2, 1/10))
@@ -157,8 +151,8 @@ Stepwise Regression on Income_cat_bc (boxcox transformed dataset)
 dummy_func <- function (df){
   x = model.matrix(Avg.bc ~., df)[, -1]
   dummy_bc = as.data.frame(x) %>% mutate(Avg.bc = df$Avg.bc)
-  #colnames(dummy_bc) <- str_replace_all(colnames(dummy_bc), "-|'|/| |,|�|&" , '_')
-  colnames(dummy_bc) <- str_replace_all(colnames(dummy_bc), "[-'/ ,�&()`]" , '_')
+  #colnames(dummy_bc) <- str_replace_all(colnames(dummy_bc), "-|'|/| |,|�|&", '_')
+  colnames(dummy_bc) <- str_replace_all(colnames(dummy_bc), "[-'/ ,�&()`]", '_')
   return(dummy_bc)
 }
 ```
@@ -189,7 +183,7 @@ backwardBIC = list(income = NULL, industry = NULL)
 for (i in k){
   bc = bcs[[i]]
   scope = list(lower = formula(model.emptys[[i]]), upper = formula(model.fulls[[i]]))
-  n_obs = bc %>% count() %>% dplyr::first()
+  n_obs = bc %>% dplyr::count() %>% dplyr::first()
   forwardBIC[[i]] = step(model.emptys[[i]], scope, direction = "forward", k = log(n_obs))
   backwardBIC[[i]] = step(model.fulls[[i]], scope, direction = "backward", k = log(n_obs))
 }
@@ -271,124 +265,15 @@ test_train_split <- function(dummy_bc, best.formula) {
   colnames(data.train)[1] = all.vars(best.formula)[1]
   colnames(data.test)[1] = all.vars(best.formula)[1]
   
-  return (list('X.train' = X.train, 'y.train' = y.train, 'X.test' = X.test, 'y.test' = y.test, 'data.train' = data.train, 'data.test' = data.test))
+  return (list('X.train' = X.train, 'y.train' = y.train, 'X.test' = X.test, 'y.test' = y.test, 'data.train' = data.train, 'data.test' = data.test, 'data' = dummy_bc))
 }
 ```
 
-```{r}
-test_train_split_old <- function(dummy_bc, best.formula) {
-  # data.test <- dummy_bc %>% filter(Year == 2019)
-  # data.train <- dummy_bc %>% filter(Year != 2019)
-  set.seed(0)
-  train.i = sample(1:nrow(dummy_bc), 0.8*nrow(dummy_bc), replace = F)
-  data.train <- dummy_bc %>% slice(train.i)
-  data.test <- dummy_bc %>% slice(-train.i)
-  
-  #train
-  #X.train <- as.matrix(data.train %>% select(-Avg.bc))
-  X.train <- model.matrix(best.formula, data = data.train)[,-1]
-  y.train <- as.matrix(data.train %>% select(all.vars(best.formula)[1]))
-
-  #test
-  #X.test <- as.matrix(data.test %>% select(-Avg.bc))
-  X.test <- model.matrix(best.formula, data = data.test)[,-1]
-  y.test <- as.matrix(data.test %>% select(all.vars(best.formula)[1]))
-  
-  #return (list('X.train' = X.train, 'y.train' = y.train, 'X.test' = X.test, 'y.test' = y.test, 'data.train' = data.train, 'data.test' = data.test))
-}
-
-#Income
-income.data.split.sat <- test_train_split(income.dummy.bc, Avg.bc ~ .)
-income.data.split <- test_train_split(income.dummy.bc, income.best.formula)
-
-#Industry
-industry.data.split.sat <- test_train_split(industry.dummy.bc, Avg.bc ~ .)
-industry.data.split <- test_train_split(industry.dummy.bc, industry.best.formula)
-
-test_train_split(income_cleaned, sat.formula)
-```
 
 
-Lasso regression for comparison to Forward Stepwise
-```{r}
-# calc_MSE <- function (model, x.test, y.test){
-#   y.predict <- predict(model, newdata = x.test)
-#   return(mean((y.predict - y.test)^2))
-# }
 
-# xy.splits <- list('income' = income.data.split, 
-#                   'industry' = industry.data.split, 
-#                   'income.sat' = income.data.split.sat, 
-#                   'industry.sat' = industry.data.split.sat)
-# 
-# lasso.list <- c('income', 'industry', 'income.sat', 'industry.sat')
-# baseline.list <- c('income.sat', 'industry.sat', 'income.sat', 'industry.sat')
-# ridge.alpha <- 0
-# 
-# for (a in 1:4){
-#   i = lasso.list[a]
-#   b = baseline.list[a]
-#   X.train <- xy.splits[[i]][['X.train']]
-#   y.train <- xy.splits[[i]][['y.train']]
-#   X.test <- xy.splits[[i]][['X.test']]
-#   y.test <- xy.splits[[i]][['y.test']]
-#   X.test.sat <- xy.splits[[b]][['X.test']]
-#   y.test.sat <- xy.splits[[b]][['y.test']]
-#   data.train <- xy.splits[[i]][['data.train']]
-#   data.test <- xy.splits[[i]][['data.test']]
-#   
-#   #create lambda grid
-#   lambda.grid = 10^seq(2, -5, length = 100)
-#   
-#   #create lasso models with lambda.grid
-#   lasso.models = glmnet(X.train, y.train, alpha = ridge.alpha, lambda = lambda.grid)
-#   
-#   #visualize coefficient shrinkage
-#   plot(lasso.models, xvar = "lambda", label = TRUE, main = paste("Lasso Regression:", i))
-#   
-#   #Cross Validation to find best lambda
-#   set.seed(0)
-#   cv.lasso.models <- cv.glmnet(X.train, y.train, alpha = ridge.alpha, lambda = lambda.grid, nfolds = 10)
-#   
-#   #visualize cross validation for lambda that minimizes the mean squared error.
-#   plot(cv.lasso.models, main = paste("Lasso Regression:", i))
-#   
-#   #Checking the best lambda
-#   log(cv.lasso.models$lambda.min)
-#   best.lambda <- cv.lasso.models$lambda.min
-#   print(paste(i, ' best.lambda:', best.lambda))
-#   # best lambda with all the variables was found to be 0.0006892612
-#   # best lambda with only the bwdBIC coefficients included was found to be 0.0003053856
-#   
-#   #looking at the lasso coefficients for the best.lambda
-#   best.lambda.coeff <- predict(lasso.models, s = best.lambda, type = "coefficients")
-#   print('Number of Coefficients:')
-#   print(dim(best.lambda.coeff)[1])
-#   
-#   #fitting a model with the best lambda found to be 0.000689 and using it to make predictions for the testing data.
-#   lasso.best.lambda.train.pred <- predict(lasso.models, s = best.lambda, newx = X.test)
-#   lasso.best.lambda.train.pred
-#   
-#   #checking MSE
-#   MSE.lasso <- mean((lasso.best.lambda.train.pred - y.test)^2)
-#   sat.model.bc <- lm(Avg.bc ~., data = data.train)
-#   
-#   
-#   temp.df <- as.data.frame(X.test.sat) #temp fix
-#   colnames(temp.df) <- str_replace_all(colnames(temp.df), "[`]", '')
-#   
-#   y.predict <- predict(sat.model.bc, newdata = temp.df)
-#   MSE.sat <- mean((y.predict - y.test.sat)^2)
-#   
-#   print(paste(i, ' Lasso MSE: ', MSE.lasso, ' ', b, ' Saturated MSE: ', MSE.sat))
-# 
-#   metrics <- eval_results(y.test, lasso.best.lambda.train.pred, data.test)
-#   print(metrics)
-#   print('********************************')
-# }
-```
 
-Function to show metrics (R^2 and MSE) for Regularization (Ridge/Lasso)
+Lasso regression for comparison to Forward Stepwise and Function to show metrics (R^2 and MSE) for Regularization (Ridge/Lasso)
 ```{r}
 regularization_func <- function (data, alpha, name){
   X.train <- data[['X.train']]
@@ -440,15 +325,24 @@ regularization_func <- function (data, alpha, name){
   return(eval_results(y.test, lasso.best.lambda.train.pred, data.test, p)['Rsquare'])
 }
 
-regularization_func(all.splits[['income_cleaned']], 0, 'income_cleaned')
-regularization_func(all.splits[['income_cleaned_bc']], 0, 'income_cleaned_bc')
-regularization_func(all.splits[['income.data.split.sat']], 0, 'income.data.split.sat')
-
 ```
 
-
+Function for calculating adjusted R squared
 ```{r}
-#all.dfs <- list(income_cleaned, income_cleaned_bc, income.dummy.bc)
+# Calculate R squared from true values and predictions
+eval_results <- function(true, predicted, df, p) {
+  n = nrow(df)
+  adj.RSS <- sum((predicted - true)^2)/(n-p-1)
+  adj.TSS <- sum((true - mean(true))^2)/(n-1)
+  adj.R_square <- 1 - adj.RSS / adj.TSS
+  #RMSE = sqrt(RSS/n)
+  
+  return(c(Rsquare = adj.R_square))
+}
+```
+
+Creates data structure that stores formulas and full,train, and test datasets for final model metric comparison
+```{r}
 
 formulas <- list(income_cleaned = sat.formula, 
                  income_cleaned_bc = sat.formula.bc, 
@@ -470,6 +364,11 @@ all.splits <- list(
   'industry.data.split.best' = test_train_split(industry.dummy.bc, formulas[['industry.data.split.best']])
 )
 
+regularization_func(all.splits[['income_cleaned']], 0, 'income_cleaned')
+```
+
+Creating models for rsquared comparison
+```{r}
 #For loops initialization
 no.reg.r2 <- c() 
 lasso.reg.r2 <- c()
@@ -490,77 +389,122 @@ for (i in names(all.splits)) {
   #ridge regularization
   ridge.reg.r2 <- c(ridge.reg.r2, regularization_func(all.splits[[i]], 0, i))
 }
-
 ```
 
-
+Adjusted R squared table for model comparison between Lasso, Ridge and No reg on cleaned, cleaned_bc, data.split.sat and data.split.best
 ```{r}
-df.rsquare <- as.data.frame(cbind('noReg' = no.reg.r2, 'lassoReg' = lasso.reg.r2, 'ridgeReg' = ridge.reg.r2))
+df.rsquare <- as.data.frame(cbind('No Regularization' = no.reg.r2, 'Lasso' = lasso.reg.r2, 'Ridge' = ridge.reg.r2))
 rownames(df.rsquare) = names(all.splits)
-df.rsquare
+df.rsquare %>% tibble::rownames_to_column(var = 'Dataset') #%>% write_csv('Shiny_app/data/final_rsquare_table.csv')
 ```
 
 
-```{r}
-# sat.model.bc <- lm(Avg.bc ~., data = xy.splits.sat[['industry']][['data.train']])
-# 
-# temp.df <- as.data.frame(xy.splits.sat[['industry']][['X.test']])
-# 
-# colnames(temp.df)[57]
-# 
-# colnames(temp.df) <- str_replace_all(colnames(temp.df), "[`]", '')
-# colnames(temp.df)
-# 
-# y.predict <- predict(sat.model.bc, newdata = temp.df)
-# MSE.sat <- mean((y.predict - xy.splits.sat[['industry']][['y.test']])^2)
-# 
-# print(paste(i, ' Lasso MSE: ', MSE.lasso, ' Saturated MSE: ', MSE.sat))
-# 
-# summary(sat.model.bc)$coefficients
-# as.data.frame(xy.splits.sat[['industry']][['X.test']]) %>% select(starts_with('`GroupOth'))
 
+
+
+
+Generating predictions using best model
+```{r}
+#Making predictions using best model on our full dataset
+forwardBIC.predict.bc <- predict(forwardBIC[['income']], newdata = all.splits[['income.data.split.best']][['data']])
+
+#Converting those target variable predictions from BoxCox transform back to Dollars
+predictions.df <- as.data.frame(forwardBIC.predict.bc) %>% mutate(`Predicted Average in Dollars` = (forwardBIC.predict.bc*income.lambda.bc+1)^(1/income.lambda.bc)) %>% tibble::rownames_to_column(var = 'Index')
+predictions.df
+
+data.df <- income_cleaned_bc %>% tibble::rownames_to_column(var = 'Index')
+data.df
+
+#joining the predicted data with the original dataset
+joined.pred.df <- inner_join(predictions.df, data.df, by = 'Index')
+joined.pred.df
+
+#Creating Master dataset with True Avg.bc, Predicted Avg.bc, True Average in Dollars and Predicted Average in Dollars for each Year, Credit Name and Income Group entry.
+income.joined.true.pred <- joined.pred.df %>% mutate(`True Average in Dollars` = (Avg.bc*income.lambda.bc+1)^(1/income.lambda.bc)) %>% relocate(`True Average in Dollars`, .before = `Predicted Average in Dollars`) %>% relocate(Avg.bc, .before = forwardBIC.predict.bc) %>% select(1:9, `Predicted Avg.bc` = forwardBIC.predict.bc, `True Avg.bc` = Avg.bc)
+
+all.splits[['income.data.split.best']][['data']] %>% select(Num)
+income.joined.true.pred
 ```
 
 
+
+For loop to include industry as well
 ```{r}
-# Calculate R squared from true values and predictions
-eval_results <- function(true, predicted, df, p) {
-  n = nrow(df)
-  adj.RSS <- sum((predicted - true)^2)/(n-p-1)
-  adj.TSS <- sum((true - mean(true))^2)/(n-1)
-  adj.R_square <- 1 - adj.RSS / adj.TSS
-  #RMSE = sqrt(RSS/n)
+#For loop initialization list
+joined.true.pred <- list('income' = NULL, 'industry' = NULL)
+lambda.bcs <- list('income' = income.lambda.bc, 'industry' = industry.lambda.bc)
+
+for (i in c('income', 'industry')) {
+  data.index <- paste0(i, '.data.split.best')
+  m <- lm(formulas[[data.index]], data = all.splits[[data.index]][['data']])
   
-  return(c(Rsquare = adj.R_square))
+  #Making predictions using best model on our full dataset
+  m.predict <- predict(m, newdata = all.splits[[data.index]][['data']])
+  
+  #Converting those target variable predictions from BoxCox transform back to Dollars
+  lambda.bc <- lambda.bcs[[i]]
+  predictions.df <- as.data.frame(m.predict) %>% 
+    mutate(`Predicted Average in Dollars` = (m.predict*lambda.bc+1)^(1/lambda.bc)) %>% 
+    tibble::rownames_to_column(var = 'Index')
+  
+  #Loading true values for join with predictions
+  true.df <- all.splits[[paste0(i, '_cleaned_bc')]][['data']] %>% tibble::rownames_to_column(var = 'Index')
+  
+  #Joining the predicted data with the true dataset
+  joined.true.pred[[i]] <- inner_join(predictions.df, true.df, by = 'Index')
+  
+  #Creating Master dataset with True Avg.bc, Predicted Avg.bc, True Average in Dollars and Predicted Average in Dollars for each Year, 
+  #Credit Name and Income Group entry.
+  joined.true.pred[[i]] <- joined.true.pred[[i]] %>% 
+    mutate(`True Average in Dollars` = (Avg.bc*lambda.bc+1)^(1/lambda.bc)) %>% 
+    relocate(`True Average in Dollars`, .before = `Predicted Average in Dollars`) %>% 
+    relocate(Avg.bc, .before = m.predict) %>% 
+    select(1:9, 
+           `Predicted Avg.bc` = m.predict, 
+           `True Avg.bc` = Avg.bc)
 }
+joined.true.pred[['income']]
+joined.true.pred[['industry']]
 
-#formula for adjusted R^2 found in following link.
-#https://www.graphpad.com/guides/prism/latest/curve-fitting/reg_adjusted-r-squared.htm
+combined.true.pred <- rbind(joined.true.pred[['income']] %>% mutate(dataset = 'income'), joined.true.pred[['industry']] %>% mutate(dataset = 'industry'))
+combined.true.pred
 ```
-
-
-
-
-
-
-
-
-Additional Calculations
 ```{r}
-as.data.frame(lasso.best.lambda.train.pred) %>% mutate(Avg_in_dollars = (lasso.best.lambda.train.pred*lambda.bc+1)^(1/lambda.bc))
+all.splits[['income.data.split.best']][['data']]
+```
+
+Writing combined predicted and true values dataset to a csv file
+```{r}
+combined.true.pred <- combined.true.pred %>% write_csv('Shiny_app/data/combined.true.pred.csv')
+```
+
+
+
+Visualizations of predictions and true values
+```{r}
+income.joined.true.pred %>% filter(Name == 'Investment Tax Credit', Group == '500,000,000 - and over') %>% ggplot(aes(Year, `True Average in Dollars`)) + geom_col()
+
+income_cleaned_bc %>% filter(Name == 'Investment Tax Credit') %>% group_by(Group, Name) %>% summarise(`Average Number of Taxpayers` = mean(Num))
+income_cleaned_bc %>% filter(Name == 'Investment Tax Credit') #%>% mutate(Year = Year + 10)
 ```
 
 ```{r}
-income.sat.data.split <- test_train_split(income.dummy.bc, Avg.bc ~ .)
-income.sat.data.split[['X.train']]
+income.joined.true.pred %>% ggplot(aes(x = `True Avg.bc`, y = `Predicted Avg.bc`)) + geom_point() + geom_smooth(method = 'lm')
 
-sat.model.bc <- lm(Avg.bc ~., data = as.data.frame(cbind(income.sat.data.split[['X.train']], income.sat.data.split[['y.train']])))
-summary(sat.model.bc)
+joined.true.pred %>% ggplot(aes(x = Avg.bc, y = log(`Predicted Average in Dollars`))) + geom_point()
 
-calc_MSE(sat.model.bc, as.data.frame(income.sat.data.split[['X.test']]), income.sat.data.split[['y.test']])
-
-
-sat.y.predict <- predict(sat.model.bc, newdata = as.data.frame(income.sat.data.split[['X.test']]))
-mean((sat.y.predict - income.sat.data.split[['y.test']])^2)
+#joined.pred.df %>% ggplot(aes(x = `Average in Dollars`)) + geom_density(aes(color = Year))
 ```
+
+
+
+```{r}
+income_cleaned %>% filter(Name == 'Investment Tax Credit') %>% group_by(Year,Group) %>% summarise(sum(Num))
+```
+
+
+
+
+
+
 
