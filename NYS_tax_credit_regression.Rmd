@@ -8,7 +8,6 @@ library(tidyverse)
 library(car)
 library(moments)
 library(glmnet)
-detach('package:plyr', unload = T)
 ```
 
 
@@ -146,15 +145,23 @@ BIC(industry.model.bc, industry.model)
 ```
 
 Stepwise Regression on Income_cat_bc (boxcox transformed dataset)
+
+```{r}
+clean_colname <- function(cols) {
+  return(str_replace_all(cols, "[-'/ ,�&()`]", '_'))
+}
+```
+
 ```{r}
 #creating dummy variable columns for stepwise
 dummy_func <- function (df){
   x = model.matrix(Avg.bc ~., df)[, -1]
   dummy_bc = as.data.frame(x) %>% mutate(Avg.bc = df$Avg.bc)
-  #colnames(dummy_bc) <- str_replace_all(colnames(dummy_bc), "-|'|/| |,|�|&", '_')
-  colnames(dummy_bc) <- str_replace_all(colnames(dummy_bc), "[-'/ ,�&()`]", '_')
+  colnames(dummy_bc) <- clean_colname(colnames(dummy_bc))
+  #colnames(dummy_bc) <- str_replace_all(colnames(dummy_bc), "[-'/ ,�&()`]", '_')
   return(dummy_bc)
 }
+
 ```
 
 Cleaning column names further so stepwise regression doesn't present any errors
@@ -268,8 +275,6 @@ test_train_split <- function(dummy_bc, best.formula) {
   return (list('X.train' = X.train, 'y.train' = y.train, 'X.test' = X.test, 'y.test' = y.test, 'data.train' = data.train, 'data.test' = data.test, 'data' = dummy_bc))
 }
 ```
-
-
 
 
 
@@ -426,9 +431,53 @@ all.splits[['income.data.split.best']][['data']] %>% select(Num)
 income.joined.true.pred
 ```
 
+Creating key dataframe for changes between user input colnames and dummy dataset colnames
+```{r}
+#Income
+as.data.frame(colnames(income.dummy.bc))
+name_key_df <- income_cleaned %>% select(col = Name) %>% distinct() %>% mutate(dummy_col = paste0('Name', clean_colname(col)))
+name_key_df
+
+group_key_df <- income_cleaned %>% select(col = Group) %>% distinct() %>% mutate(dummy_col = paste0('Group', clean_colname(col)))
+
+income_key_df <- rbind(name_key_df, group_key_df, c('Year', 'Year'), c('Num', 'Num'))
+user_input_df <- income_key_df %>% mutate(value = 0)
+user_input_df
+
+user_input_df_updated <- user_input_df %>% mutate(value = ifelse(col == 'Alcoholic Beverage Production Credit', 1, value), value = ifelse(col == 'Year', 2024, value), value = ifelse(col == 'Num', 1, value), value = ifelse(col == '$1 - $99,999', 1, value)) %>% select(-col) %>% pivot_wider(names_from = dummy_col, values_from = value)
+
+user_input_df_updated %>% select(NameAlcoholic_Beverage_Production_Credit, Year, Num, `Group$1___$99_999`)
 
 
-For loop to include industry as well
+boxcox_to_dollars <- function(x){
+  (x*income.lambda.bc+1)^(1/income.lambda.bc)
+}
+
+predict(forwardBIC[['income']], newdata = user_input_df_updated, interval = 'confidence')
+user_input_pred <- predict(forwardBIC[['income']], newdata = user_input_df_updated, interval = 'confidence')
+user_input_pred 
+
+user_input_pred %>% sapply(boxcox_to_dollars, USE.NAMES = T)
+
+```
+
+
+```{r}
+# #Industry
+# as.data.frame(colnames(industry.dummy.bc))
+# 
+# industry_name_key_df <- income_cleaned %>% select(col = Name) %>% distinct() %>% mutate(dummy_col = paste0('Name', clean_colname(col)))
+# industry_name_key_df
+# 
+# group_key_df <- income_cleaned %>% select(col = Group) %>% distinct() %>% mutate(dummy_col = paste0('Group', clean_colname(col)))
+# 
+# income_key_df <- rbind(name_key_df, group_key_df, c('Year', 'Year'), c('Num', 'Num'))
+
+```
+
+
+
+For loop to create Master dataset with Industry and Income for true and predicted values of Avg.bc and Avg in Dollars
 ```{r}
 #For loop initialization list
 joined.true.pred <- list('income' = NULL, 'industry' = NULL)
@@ -489,6 +538,7 @@ income_cleaned_bc %>% filter(Name == 'Investment Tax Credit') #%>% mutate(Year =
 ```
 
 ```{r}
+#True vs Predicted values scatterplot with regression line fitted
 income.joined.true.pred %>% ggplot(aes(x = `True Avg.bc`, y = `Predicted Avg.bc`)) + geom_point() + geom_smooth(method = 'lm')
 
 joined.true.pred %>% ggplot(aes(x = Avg.bc, y = log(`Predicted Average in Dollars`))) + geom_point()
@@ -497,9 +547,10 @@ joined.true.pred %>% ggplot(aes(x = Avg.bc, y = log(`Predicted Average in Dollar
 ```
 
 
-
+Number of taxpayers per Group for a given Credit Name and Year input (Inputs in the filter)
 ```{r}
-income_cleaned %>% filter(Name == 'Investment Tax Credit') %>% group_by(Year,Group) %>% summarise(sum(Num))
+
+income_cleaned %>% filter(Name == 'Investment Tax Credit', Year == 2019) %>% group_by(Year, Group) %>% summarise(sum(Num))
 ```
 
 

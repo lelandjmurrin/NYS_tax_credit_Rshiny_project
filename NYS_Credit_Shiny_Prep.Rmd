@@ -1,0 +1,63 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Calling the Transformed Datasets
+```{r}
+income_cleaned = read_csv('Shiny_app/data/income_cleaned.csv')
+industry_cleaned = read_csv('Shiny_app/data/industry_cleaned.csv')
+```
+
+```{r}
+clean_colname <- function(cols) {
+  return(str_replace_all(cols, "[-'/ ,�&()`]", '_'))
+}
+```
+
+Creating key dataframe for changes between user input colnames and dummy dataset colnames
+```{r}
+#Income
+as.data.frame(colnames(income.dummy.bc))
+
+income_name_key_df <- income_cleaned %>% select(col = Name) %>% distinct() %>% mutate(dummy_col = paste0('Name', clean_colname(col)))
+income_name_key_df
+
+income_group_key_df <- income_cleaned %>% select(col = Group) %>% distinct() %>% mutate(dummy_col = paste0('Group', clean_colname(col)))
+
+income_key_df <- rbind(income_name_key_df, income_group_key_df, c('Year', 'Year'), c('Num', 'Num')) %>% mutate(dataset = 'income')
+income_key_df
+
+#SHINY USER LOGIC
+# user_input_df <- key_df %>% mutate(value = 0)
+# 
+# user_input_df <- user_input_df %>% mutate(value = ifelse(col == 'Alcoholic Beverage Production Credit', 1, value), value = ifelse(col == 'Year', 2019, value)) %>% select(-col) %>% pivot_wider(names_from = dummy_col, values_from = value)
+# 
+# predict(forwardBIC[['income']], newdata = user_input_df)
+```
+
+```{r}
+#Industry
+as.data.frame(colnames(industry.dummy.bc))
+industry_cleaned %>% select(Group) %>% distinct()
+industry_name_key_df <- industry_cleaned %>% select(col = Name) %>% distinct() %>% mutate(dummy_col = paste0('Name', clean_colname(col)))
+industry_name_key_df
+
+industry_group_key_df <- industry_cleaned %>% select(col = Group) %>% distinct() %>% mutate(dummy_col = paste0('Group', clean_colname(col)))
+
+industry_key_df <- rbind(industry_name_key_df, industry_group_key_df, c('Year', 'Year'), c('Num', 'Num')) %>% mutate(dataset = 'industry')
+industry_key_df
+```
+
+```{r}
+#Combining colname key dataframes for Industry and Income and writing to csv
+user_input_key <- rbind(income_key_df, industry_key_df) %>% mutate(value = 0)
+
+user_input_key %>% write_csv('Shiny_app/data/user_input_key.csv')
+```
+
+
+```{r}
+user_input_key %>% filter(dataset == 'income', str_starts(dummy_col, 'Group')) %>% select(col) %>% as.vector() %>% dplyr::first()
+```
+

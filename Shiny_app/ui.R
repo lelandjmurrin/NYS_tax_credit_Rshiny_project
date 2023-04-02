@@ -9,6 +9,9 @@ dashboardPage(
       selectizeInput('dataset',
                      'Dataset',
                      choices = c('income', 'industry')), #dataset selection
+      selectizeInput('groupnames',
+                     'Group',
+                     choices = income_groups),
       menuItem("EDA", tabName = "eda", icon = icon("database"),
                menuSubItem('Background', tabName = 'background'),
                menuSubItem('Sample of Data', tabName = 'sample'),

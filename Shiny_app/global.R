@@ -92,6 +92,23 @@ all.dataframes <- append(all.dataframes,
 
 stepwise_BIC <- read_csv('data/stepwiseBIC_results.csv')
 
+
+#User Input Key datasets
+user_input_key <- read_csv('data/user_input_key.csv')
+
+income_groups <- user_input_key %>% 
+                      filter(dataset == 'income', str_starts(dummy_col, 'Group')) %>% 
+                      select(col) %>% 
+                      as.vector() %>% 
+                      dplyr::first()
+
+industry_groups <- user_input_key %>% 
+                      filter(dataset == 'industry', str_starts(dummy_col, 'Group')) %>% 
+                      select(col) %>% 
+                      as.vector() %>% 
+                      dplyr::first()
+
+
 #Creating Models 
 # formulas <- list(income_cleaned = sat.formula, 
 #                  income_cleaned_bc = sat.formula.bc, 
