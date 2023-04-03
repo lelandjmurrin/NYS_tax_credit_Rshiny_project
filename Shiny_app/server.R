@@ -1,7 +1,7 @@
 library(shiny)
 
 
-function(input, output){
+function(input, output, session){
   
 #REACTIVE EXPRESSIONS
   
@@ -11,6 +11,16 @@ function(input, output){
   selected.df.cleaned <- reactive({all.dataframes[[paste0(input$dataset, '_cleaned')]]})
   
   selected.df.index <- reactive({input$dataset})
+  
+  observeEvent(input$dataset,
+               {updateSelectizeInput(session, input = "groupnames",
+                                      choices = user_input_key %>%
+                                        filter(dataset == input$dataset, str_starts(dummy_col, 'Group')) %>% 
+                                        select(col) %>% 
+                                        arrange(col) %>%
+                                        as.vector() %>% 
+                                        dplyr::first())
+               })
   
   #EDA Section--------------------------------------------------------------------------------------------------------------------------------------------
   
@@ -184,7 +194,9 @@ function(input, output){
   )
   
   output$bc6 <- renderDataTable(
-    BIC(boxcox.model(), pre.boxcox.model()) %>% tibble::rownames_to_column(var = 'model') %>% mutate(model = str_replace_all(model, '.model[()]+', ''))
+    BIC(boxcox.model(), pre.boxcox.model()) %>% 
+      tibble::rownames_to_column(var = 'model') %>% 
+      mutate(model = str_replace_all(model, '.model[()]+', ''))
   )
   
   output$stepwise_bic <- renderDataTable(

@@ -15,6 +15,8 @@ clean_colname <- function(cols) {
 }
 ```
 
+
+
 Creating key dataframe for changes between user input colnames and dummy dataset colnames
 ```{r}
 #Income
@@ -58,6 +60,52 @@ user_input_key %>% write_csv('Shiny_app/data/user_input_key.csv')
 
 
 ```{r}
-user_input_key %>% filter(dataset == 'income', str_starts(dummy_col, 'Group')) %>% select(col) %>% as.vector() %>% dplyr::first()
+user_input_key %>% filter(dataset == 'income', str_starts(dummy_col, 'Group')) %>% select(col) %>% arrange(col) %>% as.vector() %>% dplyr::first()
 ```
 
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                Code for user input for making predictions and plotting predictions visualizations
+------------------------------------------------------------------------------------------------------------------------------------------------------------------
+```{r}
+user_input_df <- read_csv('Shiny_app/data/user_input_key.csv')
+best.saved.model <- readRDS('Shiny_app/data/best_models.rds')
+lambda.bcs <- readRDS('Shiny_app/data/lambda.bcs.rds')
+```
+
+```{r}
+#Income
+
+# name_key_df <- income_cleaned %>% select(col = Name) %>% distinct() %>% mutate(dummy_col = paste0('Name', clean_colname(col)))
+# name_key_df
+# 
+# group_key_df <- income_cleaned %>% select(col = Group) %>% distinct() %>% mutate(dummy_col = paste0('Group', clean_colname(col)))
+# 
+# income_key_df <- rbind(name_key_df, group_key_df, c('Year', 'Year'), c('Num', 'Num'))
+# user_input_df <- income_key_df %>% mutate(value = 0)
+# user_input_df
+
+user_input_df_updated <- user_input_df %>% mutate(value = ifelse(col == 'Alcoholic Beverage Production Credit', 1, value), value = ifelse(col == 'Year', 2019, value), value = ifelse(col == '$1 - $99,999', 1, value)) %>% select(-col) %>% pivot_wider(names_from = dummy_col, values_from = value)
+
+user_input_df_updated <- user_input_df_updated[rep(1,5),] %>% mutate(Num = c(1,50,100,200,500))
+
+user_input_df_updated %>% select(NameAlcoholic_Beverage_Production_Credit, Year, Num, `Group$1___$99_999`)
+
+```
+
+
+```{r}
+boxcox_to_dollars <- function(x, dataset){
+  (x*lambda.bcs[[dataset]]+1)^(1/lambda.bcs[[dataset]])
+}
+
+
+user_input_pred <- predict(best.saved.model[['income']], newdata = user_input_df_updated, interval = 'confidence')
+
+user_input_pred_final <- as.data.frame(user_input_pred) %>% mutate(fit_dollars = boxcox_to_dollars(fit, 'income'), lwr_dollars = boxcox_to_dollars(lwr, 'income'), upr_dollars = boxcox_to_dollars(upr, 'income')) %>% mutate(Num = user_input_df_updated$Num) 
+
+#user_input_pred_final %>% ggplot(aes(Num, fit_dollars)) + geom_point() + geom_errorbar(aes(ymin = lwr_dollars, ymax = upr_dollars)) + geom_smooth()
+user_input_pred_final
+user_input_pred_final %>% ggplot(aes(Num, fit_dollars)) + geom_ribbon(aes(ymin = lwr_dollars, ymax = upr_dollars), fill = 'grey70') + geom_point() + geom_errorbar(aes(ymin = lwr_dollars, ymax = upr_dollars)) + geom_line()
+
+```
