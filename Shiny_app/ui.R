@@ -10,11 +10,16 @@ dashboardPage(
                      'Dataset',
                      choices = c('income', 'industry')), #dataset selection
       selectizeInput('groupnames',
-                     'Group',
-                     choices = income_groups),
+                     'Income/Industry Group',
+                     choices = c()),
+      selectizeInput('creditnames',
+                     'Credit Name',
+                     choices = c()),
       selectizeInput('pred_year',
                      'Year',
                      choices = 2019:2030),
+      menuItem("Forecast", tabName = "forecast", icon = icon("line-chart")
+              ),
       menuItem("EDA", tabName = "eda", icon = icon("database"),
                menuSubItem('Background', tabName = 'background'),
                menuSubItem('Sample of Data', tabName = 'sample'),
@@ -33,8 +38,7 @@ dashboardPage(
       menuItem("Regression", tabName = "regression", icon = icon("line-chart"),
                menuSubItem('BoxCox', tabName = 'boxcox'),
                menuSubItem('Stepwise BIC', tabName = 'stepwise_bic'),
-               menuSubItem('Regularization', tabName = 'regularization'),
-               menuSubItem('Best Model', tabName = 'best_model')
+               menuSubItem('Regularization/Best Model', tabName = 'regularization_bestmodel')
                ),
       menuItem("Discussion", tabName = "discussion", icon = icon("refresh"),
                menuSubItem('Conclusions', tabName = 'conclusions'),
@@ -44,6 +48,23 @@ dashboardPage(
   ),
   dashboardBody(
       tabItems(
+          tabItem(tabName = 'forecast',
+                  fluidRow(
+                    tabBox(
+                      width = NULL,
+                      tabPanel("Introduction",
+                               htmlOutput('introduction')
+                      ),
+                      tabPanel("Forecast", 
+                               fluidRow(
+                                  column(12, plotOutput('forecast', height = 500)),
+                                  column(4, htmlOutput('num_estimate_caption'), style = 'padding:50px'),
+                                  column(8, dataTableOutput('num_estimate'), style = 'padding:50px')
+                                        )
+                      )
+                    )
+                    )
+                  ),
           tabItem(tabName = 'background',
                   htmlOutput('background')
                   ),
@@ -109,6 +130,19 @@ dashboardPage(
                   tabPanel("Stepwise BIC Results",
                             column(12, dataTableOutput('stepwise_bic'))
                                )
+                    )
+                  )
+          ),
+          tabItem(tabName = 'regularization_bestmodel',
+                  fluidRow(
+                    tabBox(
+                      width = NULL,
+                      tabPanel("Adjusted R Squared",
+                               column(offset = 2, 8, dataTableOutput('rsquare'))
+                      ),
+                      tabPanel("Root Mean Squared Error",
+                               column(offset = 2, 8, dataTableOutput('rmse'))
+                      )
                     )
                   )
           ),

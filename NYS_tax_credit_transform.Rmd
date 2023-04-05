@@ -44,11 +44,12 @@ NYS_tax_credit_net_income %>% group_by(`ENI Group`) %>% summarise(Max = max(`Mea
 ```
 
 ```{r}
+NYS_tax_credit_net_income %>% filter(`ENI Group` != 'Total', `Tax Year` == 2005)
 NYS_tax_credit_net_income %>% 
   filter(`Number of Taxpayers` > 0,
          `Amount of Credit` > 0,
          `Mean Amount of Credit` > 0,
-         Group != 'Total') %>%
+         `ENI Group` != 'Total') %>%
   mutate(`Log Number of Taxpayers` = log(`Number of Taxpayers`),
          `Log Amount of Credit` = log(`Amount of Credit`),
          `Log Mean Amount of Credit` = log(`Mean Amount of Credit`)) %>%
@@ -56,6 +57,12 @@ NYS_tax_credit_net_income %>%
          `Log Number of Taxpayers`,
          `Log Amount of Credit`,
          `Log Mean Amount of Credit`) %>%
+  chart.Correlation(histogram = T)
+
+NYS_tax_credit_net_income
+NYS_tax_credit_net_income %>% 
+  select(`Tax Year`,
+         `Number of Taxpayers`) %>%
   chart.Correlation(histogram = T)
 ```
 

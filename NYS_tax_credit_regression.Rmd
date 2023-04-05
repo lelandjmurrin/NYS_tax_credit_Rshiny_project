@@ -123,6 +123,7 @@ bc_func2 <- function (){
 
 industry_cleaned_bc <-bc_func2()
 industry_cleaned_bc
+income_cleaned_bc
 ```
 
 Checking linear regression assumptions for the transformed data.
@@ -164,7 +165,6 @@ dummy_func <- function (df){
   #colnames(dummy_bc) <- str_replace_all(colnames(dummy_bc), "[-'/ ,�&()`]", '_')
   return(dummy_bc)
 }
-
 ```
 
 Cleaning column names further so stepwise regression doesn't present any errors
@@ -184,8 +184,9 @@ Stepwise regression using BIC as the criteria (k = log(n)).
 ```{r}
 #Creating Stepwise Models
 bcs = list(income = income.dummy.bc, industry = industry.dummy.bc)
-model.fulls = list(income = lm(Avg.bc ~ ., data = income.dummy.bc), industry = lm(Avg.bc ~ ., data = industry.dummy.bc)) #All variables
-model.emptys = list(income = lm(Avg.bc ~ 1, data = income.dummy.bc), industry = lm(Avg.bc ~ 1, data = industry.dummy.bc)) #intercept only
+model.fulls = list(income = lm(Avg.bc ~ ., data = income.dummy.bc), industry = lm(Avg.bc ~ ., data = industry.dummy.bc))
+model.emptys = list(income = lm(Avg.bc ~ 1, data = income.dummy.bc), industry = lm(Avg.bc ~ Num, data = industry.dummy.bc))
+
 k = c('income', 'industry')
 forwardBIC = list(income = NULL, industry = NULL)
 backwardBIC = list(income = NULL, industry = NULL)
@@ -217,7 +218,7 @@ as.data.frame(rbind(c('income', 'forward', bic_func(forwardBIC[['income']])),
       c('industry', 'forward', bic_func(forwardBIC[['industry']])),
       c('industry', 'backward', bic_func(backwardBIC[['industry']]))
       )
-) %>% select(dataset = V1, Stepwise = V2, `Adjusted R^2` = V3, `Number of Coefficients` = V4, `Maximum VIF` = V5) %>% write_csv('Shiny_app/data/stepwiseBIC_results.csv')
+) %>% select(dataset = V1, Stepwise = V2, `Adjusted R^2` = V3, `Number of Coefficients` = V4, `Maximum VIF` = V5) #%>% write_csv('Shiny_app/data/stepwiseBIC_results.csv')
 
 bic_func(forwardBIC[['income']])
 bic_func(backwardBIC[['income']])
@@ -246,8 +247,10 @@ income.best.formula <- forwardBIC[['income']]$call[[2]]
 income.best.formula
 
 #Industry Group Dataset
-industry.best.formula <- forwardBIC[['industry']]$call[[2]]
+industry.best.formula <- backwardBIC[['industry']]$call[[2]]
 industry.best.formula
+
+
 ```
 
 
@@ -490,8 +493,7 @@ Creating key dataframe for changes between user input colnames and dummy dataset
 # 
 # user_input_pred_final %>% ggplot(aes(Num, fit_dollars)) + geom_point() + geom_errorbar(aes(ymin = lwr_dollars, ymax = upr_dollars)) + geom_smooth()
 # 
-# user_input_pred_final %>% ggplot(aes(Num, fit_dollars)) + geom_ribbon(aes(ymin = lwr_dollars, ymax = upr_dollars), fill = 'grey70') + geom_point() + geom_errorbar(aes(ymin = lwr_dollars, ymax = upr_dollars)) + geom_line() 
-
+# user_input_pred_final %>% ggplot(aes(Num, fit_dollars)) + geom_ribbon(aes(ymin = lwr_dollars, ymax = upr_dollars), fill = 'grey70') + geom_point() + geom_errorbar(aes(ymin = lwr_dollars, ymax = upr_dollars)) + geom_line()
 ```
 
 
@@ -556,7 +558,7 @@ all.splits[['income.data.split.best']][['data']]
 
 Writing combined predicted and true values dataset to a csv file
 ```{r}
-combined.true.pred <- combined.true.pred %>% write_csv('Shiny_app/data/combined.true.pred.csv')
+combined.true.pred #%>% write_csv('Shiny_app/data/combined.true.pred.csv')
 ```
 
 
@@ -581,20 +583,22 @@ joined.true.pred %>% ggplot(aes(x = Avg.bc, y = log(`Predicted Average in Dollar
 
 Number of taxpayers per Group for a given Credit Name and Year input (Inputs in the filter)
 ```{r}
-income_cleaned %>% filter(Name == 'Investment Tax Credit', Year == 2019) %>% group_by(Year, Group) %>% summarise(sum(Num))
+# income_cleaned %>% filter(Year > 2017, Name == 'Investment Tax Credit', Group == 'Zero or Net Loss') %>% group_by(Name, Year, Group) %>% summarise(Num = sum(Num)) %>% arrange(desc(Num))
 ```
 
 
 
-
+Saving best model and best formula to RDS files
 ```{r}
-library(yaml)
-write_yaml(forwardBIC[['income']], 'Shiny_app/data/best_models.yml')
-forwardBIC
+saveRDS(forwardBIC[['income']]$call[[2]], 'Shiny_app/data/income.best.formula.rds')
+saveRDS(forwardBIC[['industry']]$call[[2]], 'Shiny_app/data/industry.best.formula.rds')
 
-saveRDS(forwardBIC, 'Shiny_app/data/best_models.rds')
+best.formula <- readRDS('Shiny_app/data/income.best.formula.rds')
 
+
+saveRDS(backwardBIC, 'Shiny_app/data/best_models.rds')
 best.saved.model <- readRDS('Shiny_app/data/best_models.rds')
+
 ```
 
 

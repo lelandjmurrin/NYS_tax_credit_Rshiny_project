@@ -19,14 +19,43 @@ function(input, output, session){
                                         select(col) %>% 
                                         arrange(col) %>%
                                         as.vector() %>% 
-                                        dplyr::first())
+                                        dplyr::first()
+                                     )
+                })
+                 
+  observeEvent(input$dataset,
+               {updateSelectizeInput(session, input = "creditnames",
+                                      choices = c()
+                                     # user_input_key %>%
+                                     #    filter(dataset == input$dataset, str_starts(dummy_col, 'Name')) %>%
+                                     #    select(col) %>%
+                                     #    arrange(col) %>%
+                                     #    as.vector() %>%
+                                     #    dplyr::first()
+                                     )
                })
+  
+  observeEvent(input$groupnames,
+               {updateSelectizeInput(session, input = "creditnames",
+                                     choices = all.dataframes[[paste0(input$dataset, '_cleaned')]] %>%
+                                       filter(Group == input$groupnames) %>% 
+                                       select(Name) %>% 
+                                       distinct() %>% 
+                                       arrange(Name) %>% 
+                                       as.vector() %>%
+                                       dplyr::first()
+                                     )
+               })
+
+  #Forecast Section--------------------------------------------------------------------------------------------------------------------------------------------
+  
+  
   
   #EDA Section--------------------------------------------------------------------------------------------------------------------------------------------
   
   #Changes the selected raw sample data records between income and industry and Credit Names
   sample.df <- reactive({
-    selected.df() %>% #CHANGED THIS MARCH 28
+    selected.df() %>% 
       select(`Tax Year`,
              `Credit Type`, 
              `Credit Name`, 
@@ -65,7 +94,66 @@ function(input, output, session){
   
   
   
+  
+  
 #OUTPUT VARIABLES
+  
+  #Forecast Section------------------------------------------------------------------------------------------------------------------------------------------
+  output$introduction <- renderUI({includeHTML('www/introduction.html')})
+  
+  output$forecast <- renderPlot({
+    user_input_df_updated <- user_input_key %>%
+        filter(dataset == input$dataset) %>%
+        mutate(value = ifelse(col == input$creditnames, 1, value),
+               value = ifelse(col == 'Year', as.numeric(input$pred_year), value),
+               value = ifelse(col == input$groupnames, 1, value)) %>%
+        select(-col, -dataset) %>%
+        pivot_wider(names_from = dummy_col,
+                    values_from = value)
+
+      user_input_df_updated <- user_input_df_updated[rep(1,21),] %>%
+        mutate(Num = c(1, seq(25, 500, by = 25)))
+
+      user_input_pred <- predict.lm(best.saved.model[[input$dataset]], newdata = user_input_df_updated, interval = 'confidence')
+
+      user_input_pred_final <- as.data.frame(user_input_pred) %>%
+        mutate(fit_dollars = boxcox_to_dollars(fit, input$dataset),
+               lwr_dollars = boxcox_to_dollars(lwr, input$dataset),
+               upr_dollars = boxcox_to_dollars(upr, input$dataset)) %>%
+        mutate(Num = user_input_df_updated$Num)
+
+      user_input_pred_final %>%
+        ggplot(aes(Num, fit_dollars)) +
+        geom_ribbon(aes(ymin = lwr_dollars,
+                        ymax = upr_dollars),
+                    fill = 'lightblue3') +
+        geom_point() +
+        geom_errorbar(aes(ymin = lwr_dollars,
+                          ymax = upr_dollars)) +
+        geom_line(color = 'blue') +
+        lims(y = c(0, NA)) +
+        labs(x = 'Number of Taxpayers',
+             y = 'Avg Credit Earned per Taxpayer ($)',
+             title = paste0('PREDICTIONS', '\nCredit: ', input$creditnames, '\nYear: ', input$pred_year, ', ', 'Group: ', input$groupnames))
+  })
+  
+  output$num_estimate_caption <- renderUI({
+    HTML(paste0('The following datatable pulls the Number of Taxpayers from the NYS Tax Credit database for the<br><b>', 
+           input$creditnames, 
+           '</b><br> in the <br><b>', 
+           input$groupnames, 
+           ' group</b>'))
+  })
+  
+  output$num_estimate <- renderDataTable({
+    all.dataframes[[paste0(input$dataset, '_cleaned')]] %>% 
+      filter(Name == input$creditnames, 
+             Group == input$groupnames) %>% 
+      group_by(Name, Year, Group) %>% 
+      summarise(Num = sum(Num)) %>% 
+      arrange(desc(Year)) %>% 
+      head(5)
+  })
   
   #EDA Section----------------------------------------------------------------------------------------------------------------------------------------------
   
@@ -203,7 +291,13 @@ function(input, output, session){
     stepwise_BIC %>% filter(dataset == input$dataset) %>% select(-dataset)
   )
   
+  output$rsquare <- renderDataTable(
+    rsquare_df %>% filter(str_detect(Dataset, input$dataset))
+  )
   
+  output$rmse <- renderDataTable(
+    RMSE_df %>% filter(str_detect(Dataset, input$dataset))
+  )
   
   
   #Discussion Section ---------------------------------------------------------------------------------------------------------------------------------------------
