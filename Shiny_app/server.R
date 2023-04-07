@@ -16,7 +16,7 @@ function(input, output, session){
                {updateSelectizeInput(session, input = "groupnames",
                                       choices = user_input_key %>%
                                         filter(dataset == input$dataset, str_starts(dummy_col, 'Group')) %>% 
-                                        select(col) %>% 
+                                        dplyr::select(col) %>% 
                                         arrange(col) %>%
                                         as.vector() %>% 
                                         dplyr::first()
@@ -26,12 +26,6 @@ function(input, output, session){
   observeEvent(input$dataset,
                {updateSelectizeInput(session, input = "creditnames",
                                       choices = c()
-                                     # user_input_key %>%
-                                     #    filter(dataset == input$dataset, str_starts(dummy_col, 'Name')) %>%
-                                     #    select(col) %>%
-                                     #    arrange(col) %>%
-                                     #    as.vector() %>%
-                                     #    dplyr::first()
                                      )
                })
   
@@ -39,7 +33,7 @@ function(input, output, session){
                {updateSelectizeInput(session, input = "creditnames",
                                      choices = all.dataframes[[paste0(input$dataset, '_cleaned')]] %>%
                                        filter(Group == input$groupnames) %>% 
-                                       select(Name) %>% 
+                                       dplyr::select(Name) %>% 
                                        distinct() %>% 
                                        arrange(Name) %>% 
                                        as.vector() %>%
@@ -56,7 +50,7 @@ function(input, output, session){
   #Changes the selected raw sample data records between income and industry and Credit Names
   sample.df <- reactive({
     selected.df() %>% 
-      select(`Tax Year`,
+      dplyr::select(`Tax Year`,
              `Credit Type`, 
              `Credit Name`, 
              Group,
@@ -65,7 +59,7 @@ function(input, output, session){
       filter(`Tax Year` == 2019, 
              `Credit Name` == all.samples.credit.name[[input$dataset]],
              `Credit Type` == 'Credit Earned') %>%
-      select(-`Credit Type`)
+      dplyr::select(-`Credit Type`)
   })
 
   #Changes the group category (Year, Group and Credit Name) for the facetwraps in the Distribution Section of EDA
@@ -107,7 +101,7 @@ function(input, output, session){
         mutate(value = ifelse(col == input$creditnames, 1, value),
                value = ifelse(col == 'Year', as.numeric(input$pred_year), value),
                value = ifelse(col == input$groupnames, 1, value)) %>%
-        select(-col, -dataset) %>%
+        dplyr::select(-col, -dataset) %>%
         pivot_wider(names_from = dummy_col,
                     values_from = value)
 
@@ -154,7 +148,7 @@ function(input, output, session){
       arrange(desc(Year)) %>% 
       head(5) %>% 
       ungroup() %>% 
-      select(-c(Name,Group))
+      dplyr::select(-c(Name,Group))
   })
   
   #EDA Section----------------------------------------------------------------------------------------------------------------------------------------------
@@ -175,7 +169,7 @@ function(input, output, session){
       mutate(`Log Number of Taxpayers` = log(`Number of Taxpayers`),
              `Log Amount of Credit` = log(`Amount of Credit`),
              `Log Mean Amount of Credit` = log(`Mean Amount of Credit`)) %>%
-      select(`Tax Year`,
+      dplyr::select(`Tax Year`,
              `Log Number of Taxpayers`,
              `Log Amount of Credit`,
              `Log Mean Amount of Credit`) %>%
@@ -283,15 +277,15 @@ function(input, output, session){
   )
   
   output$stepwise_bic <- renderDataTable(
-    stepwise_BIC %>% filter(dataset == input$dataset) %>% select(-dataset)
+    stepwise_BIC %>% filter(dataset == input$dataset) %>% dplyr::select(-dataset)
   )
   
   output$rsquare <- renderDataTable(
-    final_metrics_df %>% filter(str_detect(Index, input$dataset), metric == 'adj.Rsquare') %>% select(-Index, -metric)
+    final_metrics_df %>% filter(str_detect(Index, input$dataset), metric == 'adj.Rsquare') %>% dplyr::select(-Index, -metric)
   )
   
   output$rmse <- renderDataTable(
-    final_metrics_df %>% filter(str_detect(Index, input$dataset), metric == 'RMSE') %>% select(-Index, -metric)
+    final_metrics_df %>% filter(str_detect(Index, input$dataset), metric == 'RMSE') %>% dplyr::select(-Index, -metric)
   )
   
   

@@ -1,8 +1,9 @@
+library(MASS)
+library(car)
 library(tidyverse)
 library(PerformanceAnalytics)
-library(car)
 library(glmnet)
-library(DT)
+library(rsconnect)
 
 #Cleaning up Credit Name field function
 credit_name_func <- function(df){
@@ -40,7 +41,7 @@ bc_func_income <- function (){
   lambda.bc = bc$x[which(bc$y == max(bc$y))]
   return(all.dataframes[['income_cleaned']] %>%
            mutate(Avg.bc = (Avg^lambda.bc -1)/lambda.bc) %>%
-           select(-c(Avg)))
+           dplyr::select(-c(Avg)))
 }
 
 bc_func_industry <- function (){
@@ -48,7 +49,7 @@ bc_func_industry <- function (){
   lambda.bc = bc$x[which(bc$y == max(bc$y))]
   return(all.dataframes[['industry_cleaned']] %>%
            mutate(Avg.bc = (Avg^lambda.bc -1)/lambda.bc) %>%
-           select(-c(Avg)))
+           dplyr::select(-c(Avg)))
 }
 
 income_cleaned_bc <- bc_func_income()
@@ -71,34 +72,7 @@ boxcox_to_dollars <- function(x, dataset){
   (x*lambda.bcs[[dataset]]+1)^(1/lambda.bcs[[dataset]])
 }
 
-# income_groups <- user_input_key %>% filter(dataset == 'income',
-#                                            str_starts(dummy_col, 'Group')) %>% 
-#                                     select(col) %>%
-#                                     mutate(col = c('Zero or Net Loss', 
-#                                                    '$1 - $99,999', 
-#                                                    '100,000 - 499,999', 
-#                                                    '500,000 - 999,999', 
-#                                                    '1,000,000 - 24,999,999', 
-#                                                    '25,000,000 - 49,999,999', 
-#                                                    '50,000,000 - 99,999,999', 
-#                                                    '100,000,000 - 499,999,999',
-#                                                    '500,000,000 - and over')) %>%
-#                                     as.vector() %>%
-#                                     dplyr::first()
-# 
-# # %>% 
-# #                       filter(dataset == 'income', str_starts(dummy_col, 'Group')) %>% 
-# #                       select(col) %>% 
-# #                       arrange(col) %>%
-# #                       as.vector() %>%
-# #                       dplyr::first()
-# 
-# income_creditnames <- user_input_key %>% 
-#                         filter(dataset == 'income', str_starts(dummy_col, 'Name')) %>% 
-#                         select(col) %>%
-#                         arrange(col) %>%
-#                         as.vector() %>%
-#                         dplyr::first()
+
 
 
 
