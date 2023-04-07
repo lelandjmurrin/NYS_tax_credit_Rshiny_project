@@ -142,7 +142,7 @@ function(input, output, session){
            input$creditnames, 
            '</b><br> in the <br><b>', 
            input$groupnames, 
-           ' group</b>'))
+           ' group</b><br>for up to 5 of the most recently available tax years'))
   })
   
   output$num_estimate <- renderDataTable({
@@ -150,9 +150,11 @@ function(input, output, session){
       filter(Name == input$creditnames, 
              Group == input$groupnames) %>% 
       group_by(Name, Year, Group) %>% 
-      summarise(Num = sum(Num)) %>% 
+      summarise(`Number of Taxpayers` = sum(Num)) %>% 
       arrange(desc(Year)) %>% 
-      head(5)
+      head(5) %>% 
+      ungroup() %>% 
+      select(-c(Name,Group))
   })
   
   #EDA Section----------------------------------------------------------------------------------------------------------------------------------------------
@@ -242,13 +244,6 @@ function(input, output, session){
       labs(title = 'Average Credit Amount Distribution') + 
       theme(plot.title = element_text(hjust = 0.5))
   )
-
-  # output$likelihood2 <- renderImage({
-  #   filename = paste0('www/', selected.df.index(), '_bc_likelihood_plot.png')
-  #   list(src = filename,
-  #        height = 700,
-  #        contentType = 'image/png')
-  # }, deleteFile = F)
   
   output$likelihood <- renderPlot(
     ifelse(input$dataset == 'income', 
@@ -292,15 +287,17 @@ function(input, output, session){
   )
   
   output$rsquare <- renderDataTable(
-    rsquare_df %>% filter(str_detect(Dataset, input$dataset))
+    final_metrics_df %>% filter(str_detect(Index, input$dataset), metric == 'adj.Rsquare') %>% select(-Index, -metric)
   )
   
   output$rmse <- renderDataTable(
-    RMSE_df %>% filter(str_detect(Dataset, input$dataset))
+    final_metrics_df %>% filter(str_detect(Index, input$dataset), metric == 'RMSE') %>% select(-Index, -metric)
   )
   
   
   #Discussion Section ---------------------------------------------------------------------------------------------------------------------------------------------
 
   output$conclusions <- renderUI({includeHTML('www/conclusions.html')})
+  
+  output$future_work <- renderUI({includeHTML('www/future_work.html')})
 }

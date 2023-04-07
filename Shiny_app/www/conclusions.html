@@ -4,29 +4,25 @@
 </HEAD>
 <BODY BGCOLOR="FFFFFf" LINK="006666" ALINK="8B4513" VLINK="006666">
     <h2>Summary:</h2>
-    <p>The application presents the methodology behind determining the best model 
-        for both income and industry for predicting New York State Article 9A Tax Credits earned by tax year. </p>
-    <h2>Purpose:</h2>
-    <p>The purpose of this application is to assist tax professional consultants 
-        with the best tools for advising their clients.<br>This will help the customers make the 
-        most appropriate current and future business decisions when considering possible tax credits.
-    </p>
+    <p> This website presents the application and methodology for predicting the best estimate for Earned Tax Credit  
+        for both income and industry for New York State Article 9A by tax year. </p>
+
     <h2>Conclusions:</h2>
     <ul>
     <li>The industry model generates slightly more accurate predictions compared to the income model</li>
     <li>The data had to be transformed in order to overcome the abnormal distribution 
         of the amount of credit and privacy issues resulting in missing values </li>
-    <li>The model explains approximately 70% of the variability in the test data</li>
+    <li>The model explains approximately 70% of the variability in the test data when using a train/test split of 80:20</li>
     </ul>
     <h2>Limitations:</h2>
     <ul>
-    <li>The model isn't extremely accurate, but can be used for signal comparison (Can we expect credit to go up or down across years?)</li>
+    <li>The model accuracy could be improved, but for now it can be used for signal comparison (Can we expect credit to go up or down across years?)</li>
     <li>There are some industries, income groups and credit names taken out by the 
         best model,<br>but those fields generally should remain at the same levels based 
         on Number of Taxpayers and Tax Year </li>
     <li>Credit Earned was considered over other Credit Types (e.g. Credit Carried Forward) 
         because they make the data more standardized (i.e. the Amount of Credit 
-        doesn't accumulate accross years)</li>
+        doesn't accumulate across years)</li>
     </ul>
     <h2>Recommendations:</h2>
     <ul>

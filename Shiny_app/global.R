@@ -4,47 +4,13 @@ library(car)
 library(glmnet)
 library(DT)
 
-#Cleaning up Credit Name field
+#Cleaning up Credit Name field function
 credit_name_func <- function(df){
   return (df %>%
             mutate(`Credit Name` = ifelse(str_starts(`Credit Name`, 'Alcoholic'), 'Alcoholic Beverage Production Credit', `Credit Name`),
                    `Credit Name` = ifelse(str_starts(`Credit Name`, 'Manufacture'), 'Real Property Tax Relief Credit for Manufacturing', `Credit Name`))
   )
 }
-# 
-# #Test and Train data splitting function
-# test_train_split <- function(dummy_bc, best.formula) {
-#   X <- model.matrix(best.formula, data = dummy_bc)[,-1]
-#   y <- as.matrix(dummy_bc %>% select(all.vars(best.formula)[1]))
-#   
-#   set.seed(0)
-#   train.i = sample(1:nrow(dummy_bc), 0.8*nrow(dummy_bc), replace = F)
-#   
-#   #train
-#   X.train <- X[train.i,]
-#   y.train <- y[train.i,]
-#   
-#   #test
-#   X.test <- X[-train.i,]
-#   y.test <- y[-train.i,]
-#   
-#   data.train <- as.data.frame(cbind(y.train, X.train))
-#   data.test <- as.data.frame(cbind(y.test, X.test))
-#   colnames(data.train)[1] = all.vars(best.formula)[1]
-#   colnames(data.test)[1] = all.vars(best.formula)[1]
-#   
-#   return (list('X.train' = X.train, 'y.train' = y.train, 'X.test' = X.test, 'y.test' = y.test, 'data.train' = data.train, 'data.test' = data.test))
-# }
-# 
-# #creating dummy variable columns for stepwise
-# dummy_func <- function (df){
-#   x = model.matrix(Avg.bc ~., df)[, -1]
-#   dummy_bc = as.data.frame(x) %>% mutate(Avg.bc = df$Avg.bc)
-#   #colnames(dummy_bc) <- str_replace_all(colnames(dummy_bc), "-|'|/| |,|�|&" , '_')
-#   colnames(dummy_bc) <- str_replace_all(colnames(dummy_bc), "[-'/ ,�&()`]" , '_')
-#   return(dummy_bc)
-# }
-
 
 #Loading Datasets
 NYS_tax_credit_net_income <- credit_name_func(read_csv('data/NYS_tax_credit_net_income.csv')) 
@@ -68,7 +34,7 @@ all.samples.credit.name <- list('income' = 'Alcoholic Beverage Production Credit
 
 
 
-
+#BoxCox transformation functions for producing likelihood plots
 bc_func_income <- function (){
   bc = boxCox(lm(Avg ~ ., data = all.dataframes[['income_cleaned']]), lambda = seq(-0.2, 0.2, 1/10))
   lambda.bc = bc$x[which(bc$y == max(bc$y))]
@@ -93,11 +59,11 @@ all.dataframes <- append(all.dataframes,
 
 stepwise_BIC <- read_csv('data/stepwiseBIC_results.csv')
 
-rsquare_df <- read_csv('data/final_rsquare_table.csv')
-RMSE_df <- read_csv('data/final_RMSE_table.csv')
+final_metrics_df <- read_csv('data/final_metrics_table.csv')
 
 #User Input Key datasets
 user_input_key <- read_csv('data/user_input_key.csv')
+
 best.saved.model <- readRDS('data/best_models.rds')
 lambda.bcs <- readRDS('data/lambda.bcs.rds')
 

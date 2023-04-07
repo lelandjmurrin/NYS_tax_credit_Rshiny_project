@@ -11,10 +11,10 @@ dashboardPage(
                      choices = c('income', 'industry')), #dataset selection
       selectizeInput('groupnames',
                      'Income/Industry Group',
-                     choices = c()),
+                     choices = c()), #Income/Industry Group Selection
       selectizeInput('creditnames',
                      'Credit Name',
-                     choices = c()),
+                     choices = c()), #Credit Name Selection
       selectizeInput('pred_year',
                      'Year',
                      choices = 2019:2030),
@@ -59,7 +59,7 @@ dashboardPage(
                                fluidRow(
                                   column(12, plotOutput('forecast', height = 500)),
                                   column(4, htmlOutput('num_estimate_caption'), style = 'padding:50px'),
-                                  column(8, dataTableOutput('num_estimate'), style = 'padding:50px')
+                                  column(6, dataTableOutput('num_estimate'), style = 'padding:50px')
                                         )
                       )
                     )
@@ -128,7 +128,7 @@ dashboardPage(
                 tabBox(
                   width = NULL,
                   tabPanel("Stepwise BIC Results",
-                            column(12, dataTableOutput('stepwise_bic'))
+                            column(offset = 2, 8, dataTableOutput('stepwise_bic'))
                                )
                     )
                   )
@@ -152,6 +152,16 @@ dashboardPage(
                       width = NULL,
                       tabPanel("Summary/Conclusions",
                                htmlOutput('conclusions')
+                      )
+                      )
+                    )
+                  ),
+          tabItem(tabName = 'future_work',
+                  fluidRow(
+                    tabBox(
+                      width = NULL,
+                      tabPanel("Future Work and Research",
+                               htmlOutput('future_work')
                       )
                     )
                   )
